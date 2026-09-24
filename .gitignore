@@ -1,0 +1,25 @@
+# Sistema operativo
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Editores (se conservan las recomendaciones compartidas de VS Code)
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Variables de entorno
+.env
+.env.*
+
+# Temporales
+*.log
+*.tmp
+tmp/
