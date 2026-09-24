@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Descarga un sound effect de Epidemic Sound a assets/ y lo registra en index.json.
-// Uso: node scripts/download.mjs <url-del-track> <titulo>
+// Uso: node scripts/download.mjs <url-del-track> <titulo> [url-de-imagen]
 
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -14,9 +14,18 @@ const INDEX_FILE = path.join(ROOT, "index.json");
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 
-const [url, title] = process.argv.slice(2);
+const IMAGE_EXTENSIONS = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "image/svg+xml": ".svg",
+  "image/avif": ".avif",
+};
+
+const [url, title, imageUrl] = process.argv.slice(2);
 if (!url || !title) {
-  console.error("Uso: node scripts/download.mjs <url-del-track> <titulo>");
+  console.error("Uso: node scripts/download.mjs <url-del-track> <titulo> [url-de-imagen]");
   process.exit(1);
 }
 
@@ -45,9 +54,27 @@ const audio = Buffer.from(await (await fetchOk(audioUrl)).arrayBuffer());
 const assetId = createHash("sha256").update(audio).digest("hex");
 const ext = path.extname(new URL(audioUrl).pathname) || ".mp3";
 
+// Se descarga antes de escribir nada para no dejar el audio a medias si la imagen falla.
+let image;
+if (imageUrl) {
+  const res = await fetchOk(imageUrl);
+  const contentType = res.headers.get("content-type")?.split(";")[0].trim().toLowerCase() ?? "";
+  if (!contentType.startsWith("image/")) {
+    throw new Error(`La URL no es una imagen (content-type: ${contentType || "desconocido"})`);
+  }
+  const imageExt = IMAGE_EXTENSIONS[contentType] ?? (path.extname(new URL(imageUrl).pathname) || ".img");
+  image = { data: Buffer.from(await res.arrayBuffer()), ext: imageExt };
+}
+
 await mkdir(ASSETS_DIR, { recursive: true });
 const filePath = path.join(ASSETS_DIR, `${assetId}${ext}`);
 await writeFile(filePath, audio);
+
+let imagePath;
+if (image) {
+  imagePath = path.join(ASSETS_DIR, `${assetId}${image.ext}`);
+  await writeFile(imagePath, image.data);
+}
 
 const index = existsSync(INDEX_FILE) ? JSON.parse(await readFile(INDEX_FILE, "utf8")) : [];
 const existing = index.find((entry) => entry.assetId === assetId);
@@ -61,3 +88,4 @@ await writeFile(INDEX_FILE, JSON.stringify(index, null, 4) + "\n");
 console.log(`${existing ? "Actualizado" : "Agregado"}: "${title}"`);
 console.log(`  assetId: ${assetId}`);
 console.log(`  archivo: ${path.relative(ROOT, filePath)}`);
+if (imagePath) console.log(`  imagen:  ${path.relative(ROOT, imagePath)}`);
