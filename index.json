@@ -113,5 +113,10 @@
         "title": "batalla pokemon",
         "assetId": "31585326d3163007b6847f11b47efd6566a6c63e49ec6511261e291105731be1",
         "durationMs": 14800
+    },
+    {
+        "title": "tortuga",
+        "assetId": "278f0571897e3be7aef0e328adeea14fb14caf2aad713c763ec6d742e1475153",
+        "durationMs": 7200
     }
 ]
