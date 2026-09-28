@@ -2,7 +2,8 @@
 // Descarga un sonido (Epidemic Sound, YouTube u otro sitio soportado por yt-dlp), lo convierte a
 // Ogg Vorbis con volumen normalizado, lo guarda en assets/ y lo registra en index.json.
 // Las imágenes PNG/JPG se reducen y se guardan en WebP; GIF y demás formatos se guardan tal cual.
-// Uso: node scripts/download.mjs <url-del-sonido> <titulo> [url-de-imagen] [--stereo]
+// Uso: node scripts/download.mjs <url-del-sonido> <titulo> [url-de-imagen] [--stereo] [--from <tiempo>] [--to <tiempo>]
+// Los tiempos aceptan segundos (3.5) o formato de reloj (1:23, 1:02:03.5).
 
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -11,7 +12,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { parseArgs, promisify } from "node:util";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ASSETS_DIR = path.join(ROOT, "assets");
@@ -49,13 +50,40 @@ const INSTALL_HINTS = {
 
 const run = promisify(execFile);
 
-const args = process.argv.slice(2);
-const stereo = args.includes("--stereo");
-const [url, title, imageUrl] = args.filter((arg) => !arg.startsWith("--"));
-if (!url || !title) {
-  console.error("Uso: node scripts/download.mjs <url-del-sonido> <titulo> [url-de-imagen] [--stereo]");
+const USAGE =
+  "Uso: node scripts/download.mjs <url-del-sonido> <titulo> [url-de-imagen] [--stereo] [--from <tiempo>] [--to <tiempo>]";
+
+function fail(message) {
+  console.error(message);
   process.exit(1);
 }
+
+// Convierte "3.5", "1:23" o "1:02:03.5" a segundos.
+function parseTime(value, flag) {
+  if (value === undefined) return undefined;
+  if (!/^\d+(:\d{1,2}){0,2}(\.\d+)?$/.test(value)) fail(`Tiempo inválido en ${flag}: "${value}". Usa segundos (3.5) o mm:ss (1:23).`);
+  return value.split(":").reduce((total, part) => total * 60 + Number(part), 0);
+}
+
+let parsed;
+try {
+  parsed = parseArgs({
+    allowPositionals: true,
+    options: {
+      stereo: { type: "boolean", default: false },
+      from: { type: "string" },
+      to: { type: "string" },
+    },
+  });
+} catch (error) {
+  fail(`${error.message}\n${USAGE}`);
+}
+const [url, title, imageUrl] = parsed.positionals;
+if (!url || !title) fail(USAGE);
+const { stereo } = parsed.values;
+const trimStart = parseTime(parsed.values.from, "--from");
+const trimEnd = parseTime(parsed.values.to, "--to");
+if (trimStart !== undefined && trimEnd !== undefined && trimEnd <= trimStart) fail("--to debe ser mayor que --from");
 
 async function fetchOk(target) {
   const res = await fetch(target, { headers: { "User-Agent": USER_AGENT } });
@@ -114,7 +142,29 @@ async function downloadWithYtDlp(videoUrl, dir) {
   return path.join(dir, file);
 }
 
+// atrim va antes de loudnorm para que el volumen se mida solo sobre el fragmento recortado.
+function audioFilter() {
+  if (trimStart === undefined && trimEnd === undefined) return AUDIO_FILTER;
+  const bounds = [trimStart !== undefined && `start=${trimStart}`, trimEnd !== undefined && `end=${trimEnd}`].filter(Boolean);
+  return `atrim=${bounds.join(":")},asetpts=PTS-STARTPTS,${AUDIO_FILTER}`;
+}
+
+async function probeDuration(filePath) {
+  const { stdout } = await runTool("ffprobe", [
+    "-v", "error",
+    "-show_entries", "format=duration",
+    "-of", "csv=p=0",
+    filePath,
+  ]);
+  return Number(stdout.trim());
+}
+
 async function convertToOgg(sourcePath, dir) {
+  const sourceDuration = await probeDuration(sourcePath);
+  if (trimStart !== undefined && trimStart >= sourceDuration) {
+    throw new Error(`--from (${trimStart} s) está después del final del audio (${sourceDuration.toFixed(2)} s)`);
+  }
+
   const outputPath = path.join(dir, `output${AUDIO_EXT}`);
   await runTool("ffmpeg", [
     "-hide_banner",
@@ -122,20 +172,14 @@ async function convertToOgg(sourcePath, dir) {
     "-i", sourcePath,
     "-vn",
     "-map_metadata", "-1",
-    "-af", AUDIO_FILTER,
+    "-af", audioFilter(),
     "-ac", stereo ? "2" : "1",
     "-ar", AUDIO_SAMPLE_RATE,
     "-c:a", "libvorbis",
     "-q:a", AUDIO_QUALITY,
     outputPath,
   ]);
-  const { stdout } = await runTool("ffprobe", [
-    "-v", "error",
-    "-show_entries", "format=duration",
-    "-of", "csv=p=0",
-    outputPath,
-  ]);
-  return { data: await readFile(outputPath), durationMs: Math.round(Number(stdout.trim()) * 1000) };
+  return { data: await readFile(outputPath), durationMs: Math.round((await probeDuration(outputPath)) * 1000) };
 }
 
 async function downloadAudio(sourceUrl) {
