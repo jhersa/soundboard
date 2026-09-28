@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Descarga un sonido (Epidemic Sound, YouTube u otro sitio soportado por yt-dlp) a assets/
-// y lo registra en index.json.
-// Uso: node scripts/download.mjs <url-del-sonido> <titulo> [url-de-imagen]
+// Descarga un sonido (Epidemic Sound, YouTube u otro sitio soportado por yt-dlp), lo convierte a
+// Ogg Vorbis con volumen normalizado, lo guarda en assets/ y lo registra en index.json.
+// Uso: node scripts/download.mjs <url-del-sonido> <titulo> [url-de-imagen] [--stereo]
 
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -27,9 +27,20 @@ const IMAGE_EXTENSIONS = {
   "image/avif": ".avif",
 };
 
-const [url, title, imageUrl] = process.argv.slice(2);
+// Ogg Vorbis se reproduce en todas las versiones de Android (minSdk 24), incluido SoundPool.
+// loudnorm iguala el volumen percibido entre audios de fuentes distintas (EBU R128, -16 LUFS).
+const AUDIO_EXT = ".ogg";
+const AUDIO_FILTER = "loudnorm=I=-16:TP=-1.5:LRA=11";
+const AUDIO_SAMPLE_RATE = "44100";
+const AUDIO_QUALITY = "4";
+
+const run = promisify(execFile);
+
+const args = process.argv.slice(2);
+const stereo = args.includes("--stereo");
+const [url, title, imageUrl] = args.filter((arg) => !arg.startsWith("--"));
 if (!url || !title) {
-  console.error("Uso: node scripts/download.mjs <url-del-sonido> <titulo> [url-de-imagen]");
+  console.error("Uso: node scripts/download.mjs <url-del-sonido> <titulo> [url-de-imagen] [--stereo]");
   process.exit(1);
 }
 
@@ -39,7 +50,16 @@ async function fetchOk(target) {
   return res;
 }
 
-async function downloadFromEpidemic(trackUrl) {
+async function runTool(command, commandArgs) {
+  try {
+    return await run(command, commandArgs);
+  } catch (error) {
+    if (error.code === "ENOENT") throw new Error(`No se encontró ${command}. Instálalo con: brew install yt-dlp ffmpeg`);
+    throw error;
+  }
+}
+
+async function downloadFromEpidemic(trackUrl, dir) {
   const trackId = trackUrl.match(/tracks\/([0-9a-f-]{36})/i)?.[1];
   if (!trackId) throw new Error(`No se encontró el id del track en la URL: ${trackUrl}`);
 
@@ -52,33 +72,58 @@ async function downloadFromEpidemic(trackUrl) {
   const audioUrl = trackData.match(/"lqMp3Url":"([^"]+)"/)?.[1];
   if (!audioUrl) throw new Error("No se encontró la URL del audio");
 
-  return {
-    data: Buffer.from(await (await fetchOk(audioUrl)).arrayBuffer()),
-    ext: path.extname(new URL(audioUrl).pathname) || ".mp3",
-  };
+  const sourcePath = path.join(dir, `source${path.extname(new URL(audioUrl).pathname) || ".mp3"}`);
+  await writeFile(sourcePath, Buffer.from(await (await fetchOk(audioUrl)).arrayBuffer()));
+  return sourcePath;
 }
 
-// yt-dlp extrae el audio y ffmpeg lo convierte a mp3 en una carpeta temporal.
-async function downloadWithYtDlp(videoUrl) {
-  const tmpDir = await mkdtemp(path.join(os.tmpdir(), "soundboard-"));
+// Se baja el mejor audio original sin convertir; la única conversión la hace ffmpeg después.
+async function downloadWithYtDlp(videoUrl, dir) {
+  await runTool("yt-dlp", [
+    "--format", "bestaudio/best",
+    "--no-playlist",
+    "--quiet",
+    "--no-warnings",
+    "--output", path.join(dir, "source.%(ext)s"),
+    videoUrl,
+  ]);
+  const file = (await readdir(dir)).find((name) => name.startsWith("source."));
+  if (!file) throw new Error("yt-dlp no generó el archivo de audio");
+  return path.join(dir, file);
+}
+
+async function convertToOgg(sourcePath, dir) {
+  const outputPath = path.join(dir, `output${AUDIO_EXT}`);
+  await runTool("ffmpeg", [
+    "-hide_banner",
+    "-loglevel", "error",
+    "-i", sourcePath,
+    "-vn",
+    "-map_metadata", "-1",
+    "-af", AUDIO_FILTER,
+    "-ac", stereo ? "2" : "1",
+    "-ar", AUDIO_SAMPLE_RATE,
+    "-c:a", "libvorbis",
+    "-q:a", AUDIO_QUALITY,
+    outputPath,
+  ]);
+  const { stdout } = await runTool("ffprobe", [
+    "-v", "error",
+    "-show_entries", "format=duration",
+    "-of", "csv=p=0",
+    outputPath,
+  ]);
+  return { data: await readFile(outputPath), durationMs: Math.round(Number(stdout.trim()) * 1000) };
+}
+
+async function downloadAudio(sourceUrl) {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "soundboard-"));
   try {
-    await promisify(execFile)("yt-dlp", [
-      "--extract-audio",
-      "--audio-format", "mp3",
-      "--no-playlist",
-      "--quiet",
-      "--no-warnings",
-      "--output", path.join(tmpDir, "audio.%(ext)s"),
-      videoUrl,
-    ]);
-    const file = (await readdir(tmpDir)).find((name) => name.endsWith(".mp3"));
-    if (!file) throw new Error("yt-dlp no generó el archivo de audio");
-    return { data: await readFile(path.join(tmpDir, file)), ext: ".mp3" };
-  } catch (error) {
-    if (error.code === "ENOENT") throw new Error("No se encontró yt-dlp. Instálalo con: brew install yt-dlp ffmpeg");
-    throw error;
+    const isEpidemic = new URL(sourceUrl).hostname.endsWith("epidemicsound.com");
+    const sourcePath = isEpidemic ? await downloadFromEpidemic(sourceUrl, dir) : await downloadWithYtDlp(sourceUrl, dir);
+    return await convertToOgg(sourcePath, dir);
   } finally {
-    await rm(tmpDir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true });
   }
 }
 
@@ -94,15 +139,14 @@ async function downloadImage(target) {
   };
 }
 
-const isEpidemic = new URL(url).hostname.endsWith("epidemicsound.com");
-const audio = isEpidemic ? await downloadFromEpidemic(url) : await downloadWithYtDlp(url);
+const audio = await downloadAudio(url);
 // Se descarga antes de escribir nada para no dejar el audio a medias si la imagen falla.
 const image = imageUrl ? await downloadImage(imageUrl) : undefined;
 
 const assetId = createHash("sha256").update(audio.data).digest("hex");
 
 await mkdir(ASSETS_DIR, { recursive: true });
-const filePath = path.join(ASSETS_DIR, `${assetId}${audio.ext}`);
+const filePath = path.join(ASSETS_DIR, `${assetId}${AUDIO_EXT}`);
 await writeFile(filePath, audio.data);
 
 let imagePath;
@@ -115,12 +159,14 @@ const index = existsSync(INDEX_FILE) ? JSON.parse(await readFile(INDEX_FILE, "ut
 const existing = index.find((entry) => entry.assetId === assetId);
 if (existing) {
   existing.title = title;
+  existing.durationMs = audio.durationMs;
 } else {
-  index.push({ title, assetId });
+  index.push({ title, assetId, durationMs: audio.durationMs });
 }
 await writeFile(INDEX_FILE, JSON.stringify(index, null, 4) + "\n");
 
 console.log(`${existing ? "Actualizado" : "Agregado"}: "${title}"`);
-console.log(`  assetId: ${assetId}`);
-console.log(`  archivo: ${path.relative(ROOT, filePath)}`);
-if (imagePath) console.log(`  imagen:  ${path.relative(ROOT, imagePath)}`);
+console.log(`  assetId:  ${assetId}`);
+console.log(`  duración: ${(audio.durationMs / 1000).toFixed(2)} s`);
+console.log(`  archivo:  ${path.relative(ROOT, filePath)} (${Math.round(audio.data.length / 1024)} KB)`);
+if (imagePath) console.log(`  imagen:   ${path.relative(ROOT, imagePath)}`);
