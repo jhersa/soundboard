@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Descarga un sonido (Epidemic Sound, YouTube u otro sitio soportado por yt-dlp), lo convierte a
 // Ogg Vorbis con volumen normalizado, lo guarda en assets/ y lo registra en index.json.
+// Las imágenes PNG/JPG se reducen y se guardan en WebP; GIF y demás formatos se guardan tal cual.
 // Uso: node scripts/download.mjs <url-del-sonido> <titulo> [url-de-imagen] [--stereo]
 
 import { execFile } from "node:child_process";
@@ -34,6 +35,18 @@ const AUDIO_FILTER = "loudnorm=I=-16:TP=-1.5:LRA=11";
 const AUDIO_SAMPLE_RATE = "44100";
 const AUDIO_QUALITY = "4";
 
+// Suficiente para un botón de ~120 dp en pantallas xxxhdpi. Solo se reduce, nunca se amplía.
+const IMAGE_MAX_SIZE = 384;
+const IMAGE_QUALITY = "80";
+const RESIZABLE_IMAGE_TYPES = new Set(["image/png", "image/jpeg"]);
+
+const INSTALL_HINTS = {
+  "yt-dlp": "brew install yt-dlp",
+  ffmpeg: "brew install ffmpeg",
+  ffprobe: "brew install ffmpeg",
+  cwebp: "brew install webp",
+};
+
 const run = promisify(execFile);
 
 const args = process.argv.slice(2);
@@ -54,8 +67,17 @@ async function runTool(command, commandArgs) {
   try {
     return await run(command, commandArgs);
   } catch (error) {
-    if (error.code === "ENOENT") throw new Error(`No se encontró ${command}. Instálalo con: brew install yt-dlp ffmpeg`);
+    if (error.code === "ENOENT") throw new Error(`No se encontró ${command}. Instálalo con: ${INSTALL_HINTS[command]}`);
     throw error;
+  }
+}
+
+async function withTempDir(fn) {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "soundboard-"));
+  try {
+    return await fn(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 }
 
@@ -117,14 +139,34 @@ async function convertToOgg(sourcePath, dir) {
 }
 
 async function downloadAudio(sourceUrl) {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "soundboard-"));
-  try {
+  return withTempDir(async (dir) => {
     const isEpidemic = new URL(sourceUrl).hostname.endsWith("epidemicsound.com");
     const sourcePath = isEpidemic ? await downloadFromEpidemic(sourceUrl, dir) : await downloadWithYtDlp(sourceUrl, dir);
-    return await convertToOgg(sourcePath, dir);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+    return convertToOgg(sourcePath, dir);
+  });
+}
+
+async function convertToWebp(data, sourceExt) {
+  return withTempDir(async (dir) => {
+    const sourcePath = path.join(dir, `source${sourceExt}`);
+    const outputPath = path.join(dir, "output.webp");
+    await writeFile(sourcePath, data);
+
+    const { stdout } = await runTool("ffprobe", [
+      "-v", "error",
+      "-select_streams", "v:0",
+      "-show_entries", "stream=width,height",
+      "-of", "csv=s=x:p=0",
+      sourcePath,
+    ]);
+    const [width, height] = stdout.trim().split("x").map(Number);
+    // cwebp mantiene la proporción cuando una de las dos dimensiones es 0.
+    const resize =
+      Math.max(width, height) <= IMAGE_MAX_SIZE ? [] : width >= height ? ["-resize", String(IMAGE_MAX_SIZE), "0"] : ["-resize", "0", String(IMAGE_MAX_SIZE)];
+
+    await runTool("cwebp", ["-quiet", "-q", IMAGE_QUALITY, "-metadata", "none", ...resize, sourcePath, "-o", outputPath]);
+    return readFile(outputPath);
+  });
 }
 
 async function downloadImage(target) {
@@ -133,10 +175,10 @@ async function downloadImage(target) {
   if (!contentType.startsWith("image/")) {
     throw new Error(`La URL no es una imagen (content-type: ${contentType || "desconocido"})`);
   }
-  return {
-    data: Buffer.from(await res.arrayBuffer()),
-    ext: IMAGE_EXTENSIONS[contentType] ?? (path.extname(new URL(target).pathname) || ".img"),
-  };
+  const data = Buffer.from(await res.arrayBuffer());
+  const ext = IMAGE_EXTENSIONS[contentType] ?? (path.extname(new URL(target).pathname) || ".img");
+  if (!RESIZABLE_IMAGE_TYPES.has(contentType)) return { data, ext };
+  return { data: await convertToWebp(data, ext), ext: ".webp" };
 }
 
 const audio = await downloadAudio(url);
