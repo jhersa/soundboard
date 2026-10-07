@@ -168,5 +168,10 @@
         "title": "power rangers",
         "assetId": "28598ae630a718114d4543296a9df796563116a2392b87333a3a3921f396e3b3",
         "durationMs": 29600
+    },
+    {
+        "title": "alex syntek",
+        "assetId": "ed303d1be0f19b3a0e676b20ef5a1869949bc6c499a0f22790a09a3279e6823b",
+        "durationMs": 32000
     }
 ]
