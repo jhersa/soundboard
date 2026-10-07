@@ -153,5 +153,10 @@
         "title": "capitanaso perra",
         "assetId": "5f25accc42d9318c27bd475682a4877184cb02026d9d09950745726c4f2083be",
         "durationMs": 2000
+    },
+    {
+        "title": "careless whispers",
+        "assetId": "9524bf2cfb4efa19ea6e0399d8061789ee70f1f05623c219b844e9dba83d321e",
+        "durationMs": 15000
     }
 ]
