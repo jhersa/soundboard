@@ -35,9 +35,9 @@ Requisitos: Go 1.27+, Node 22+ (solo para el panel), pnpm 11. El processor sin D
 
 ```bash
 pnpm install
-pnpm test                                     # todos los tests
-pnpm typecheck                                # tsc / vue-tsc / go vet en todos los paquetes
-pnpm --filter @soundboard/api test            # solo la API (go test ./...)
+pnpm test                                     # todos los tests (Go y Node)
+pnpm typecheck                                # go vet / tsc / vue-tsc en todos los paquetes
+(cd apps/api && go test ./...)                # solo la API (igual en apps/processor y packages/gosig)
 pnpm dev:api                                  # API en http://localhost:8788 (go run ./cmd/api serve, lee apps/api/.env)
 pnpm dev:api:lan                              # igual, pero escuchando en 0.0.0.0 (teléfono por Wi-Fi)
 pnpm dev:admin                                # panel en http://localhost:5173
@@ -108,4 +108,4 @@ Antes de dar un cambio por terminado, corre `pnpm typecheck` y `pnpm test`.
 - En macOS el puerto 5000 lo ocupa el Receptor AirPlay; la API usa 8788.
 - Si `apt-get` falla en Docker con "invalid signature", casi siempre es que el disco de Docker Desktop está lleno (revisa con `docker system df`).
 - `pnpm-workspace.yaml` no tiene `allowBuilds`: ninguna dependencia necesita scripts de instalación. Si agregas una que sí, apruébala ahí.
-- `apps/api`, `apps/processor` y `packages/gosig` tienen un `package.json` mínimo solo para que `pnpm test` y `pnpm typecheck` recorran también el código Go; no tienen dependencias de Node.
+- Los módulos de Go (`apps/api`, `apps/processor`, `packages/gosig`) no tienen `package.json`: `go.work` los agrupa y los scripts de la raíz llaman a `go` con sus rutas. Si agregas otro módulo de Go, súmalo a `go.work` y a los scripts `test` y `typecheck` de `package.json`.

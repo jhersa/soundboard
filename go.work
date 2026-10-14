@@ -1,0 +1,9 @@
+go 1.27
+
+// Los tres módulos de Go se prueban juntos desde la raíz (`pnpm test`, `pnpm typecheck`).
+// Los Dockerfiles no lo usan; cada uno construye su módulo con el `replace` de su go.mod.
+use (
+	./apps/api
+	./apps/processor
+	./packages/gosig
+)

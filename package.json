@@ -7,11 +7,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev:api": "pnpm --filter @soundboard/api dev",
-    "dev:api:lan": "pnpm --filter @soundboard/api dev:lan",
+    "dev:api": "cd apps/api && go run ./cmd/api serve",
+    "dev:api:lan": "cd apps/api && ADDR=0.0.0.0:8788 go run ./cmd/api serve",
     "dev:admin": "pnpm --filter @soundboard/admin dev",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
+    "test": "go test ./apps/api/... ./apps/processor/... ./packages/gosig/... && pnpm -r --if-present test",
+    "typecheck": "go vet ./apps/api/... ./apps/processor/... ./packages/gosig/... && pnpm -r --if-present typecheck",
     "migrate:v1": "node scripts/migrate-v1.mjs",
     "brand:build": "node brand/scripts/build.mjs"
   },
