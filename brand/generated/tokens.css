@@ -1,0 +1,92 @@
+/* Generado por brand/scripts/build.mjs desde tokens.json. No editar a mano. */
+:root {
+  color-scheme: light dark;
+
+  /* Marca (iguales en claro y oscuro) */
+  --brand-yellow: #FFD600;
+  --brand-yellow-dark: #C7A500;
+  --brand-lime: #B2FF59;
+  --brand-magenta: #E040FB;
+  --brand-cyan: #40C4FF;
+  --brand-orange: #FFAB40;
+  --brand-red: #FF5252;
+  --brand-violet-neon: #C04BFF;
+  --brand-splash: #0E0A14;
+
+  /* Formas */
+  --radius-small: 10px;
+  --radius-medium: 16px;
+  --radius-large: 22px;
+  --radius-pill: 999px;
+
+  /* Tipografía */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --type-title-large: 600 22px/28px var(--font-mono);
+  --type-title-large-spacing: 0px;
+  --type-body-large: 400 16px/24px var(--font-sans);
+  --type-body-large-spacing: 0.5px;
+  --type-label-medium: 600 12px/16px var(--font-sans);
+  --type-label-medium-spacing: 0.2px;
+
+  /* Colores: claro por defecto */
+  --color-primary: #C7A500;
+  --color-on-primary: #000000;
+  --color-secondary: #8BDB2A;
+  --color-on-secondary: #000000;
+  --color-tertiary: #E040FB;
+  --color-on-tertiary: #000000;
+  --color-background: #F7F7F5;
+  --color-on-background: #16171D;
+  --color-surface: #FFFFFF;
+  --color-on-surface: #16171D;
+  --color-surface-variant: #EDEDEA;
+  --color-on-surface-variant: #5C5E66;
+  --color-outline: #D8D8D4;
+  --color-error: #D32F2F;
+  --color-success: #2E7D00;
+  --color-warning: #A04F00;
+  --color-info: #006FA8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-primary: #FFD600;
+    --color-on-primary: #000000;
+    --color-secondary: #B2FF59;
+    --color-on-secondary: #000000;
+    --color-tertiary: #E040FB;
+    --color-on-tertiary: #000000;
+    --color-background: #0A0A0A;
+    --color-on-background: #F8F8F0;
+    --color-surface: #141414;
+    --color-on-surface: #F8F8F0;
+    --color-surface-variant: #1E1E1E;
+    --color-on-surface-variant: #A0A09A;
+    --color-outline: #2E2E2E;
+    --color-error: #FF5252;
+    --color-success: #B2FF59;
+    --color-warning: #FFAB40;
+    --color-info: #40C4FF;
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-primary: #FFD600;
+  --color-on-primary: #000000;
+  --color-secondary: #B2FF59;
+  --color-on-secondary: #000000;
+  --color-tertiary: #E040FB;
+  --color-on-tertiary: #000000;
+  --color-background: #0A0A0A;
+  --color-on-background: #F8F8F0;
+  --color-surface: #141414;
+  --color-on-surface: #F8F8F0;
+  --color-surface-variant: #1E1E1E;
+  --color-on-surface-variant: #A0A09A;
+  --color-outline: #2E2E2E;
+  --color-error: #FF5252;
+  --color-success: #B2FF59;
+  --color-warning: #FFAB40;
+  --color-info: #40C4FF;
+}

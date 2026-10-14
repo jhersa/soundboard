@@ -12,7 +12,8 @@
     "dev:admin": "pnpm --filter @soundboard/admin dev",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "migrate:v1": "node scripts/migrate-v1.mjs"
+    "migrate:v1": "node scripts/migrate-v1.mjs",
+    "brand:build": "node brand/scripts/build.mjs"
   },
   "devDependencies": {
     "typescript": "~5.9.3"
