@@ -1,0 +1,68 @@
+# Se construye en tu Mac: la e2-micro (1 GB) no aguanta `pnpm install` ni `vite build`.
+# Se publica en Artifact Registry: en cada push solo suben las capas que cambiaron.
+# buildx emula amd64 con QEMU, así que el primer build tarda varios minutos.
+- name: Crear carpeta de artefactos
+  ansible.builtin.file:
+    path: "{{ build_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Verificar la sesión de gcloud (el push usa `gcloud auth login`, no las application-default)
+  ansible.builtin.command: gcloud auth print-access-token
+  changed_when: false
+  no_log: true
+  register: gcloud_token
+  failed_when: false
+
+- name: Avisar si la sesión de gcloud expiró
+  ansible.builtin.fail:
+    msg: "La sesión de gcloud expiró o no existe. Corre `gcloud auth login` y vuelve a intentar."
+  when: gcloud_token.rc != 0
+
+# El disco de Docker Desktop es limitado (40 GB por defecto): antes de construir se borra la
+# caché de build sin usar en una semana. Lo reciente se conserva para que el build siga siendo rápido.
+- name: Liberar caché de build vieja
+  ansible.builtin.command: docker builder prune -af --filter until=168h
+  changed_when: "'Total:\t0B' not in prune_cache.stdout"
+  register: prune_cache
+
+- name: Autenticar Docker local con Artifact Registry
+  ansible.builtin.command: gcloud auth configure-docker {{ registry_host }} --quiet
+  changed_when: false
+
+- name: Construir y publicar imágenes linux/amd64
+  ansible.builtin.command:
+    cmd: >-
+      docker buildx build --platform linux/amd64
+      -f apps/{{ item }}/Dockerfile
+      -t {{ registry }}/{{ item }}:{{ image_tag }}
+      --provenance=false
+      --push
+      .
+    chdir: "{{ repo_dir }}"
+  loop: [api, processor]
+  changed_when: true
+
+- name: Construir el panel (dist/ estático)
+  ansible.builtin.command:
+    cmd: >-
+      docker buildx build -f apps/admin/Dockerfile
+      --build-arg VITE_API_URL=https://{{ api_domain }}
+      --build-arg VITE_GOOGLE_CLIENT_ID={{ google_web_client_id }}
+      --output type=local,dest={{ build_dir }}/admin
+      .
+    chdir: "{{ repo_dir }}"
+  changed_when: true
+
+# Las imágenes ya quedaron en Artifact Registry; las copias locales solo ocupan espacio.
+- name: Quitar copias locales de las imágenes publicadas
+  ansible.builtin.command: docker image rm {{ registry }}/{{ item }}:{{ image_tag }}
+  loop: [api, processor]
+  register: rm_images
+  changed_when: rm_images.rc == 0
+  failed_when: false
+
+- name: Borrar imágenes locales sin tag
+  ansible.builtin.command: docker image prune -f
+  register: prune_images
+  changed_when: "'Total reclaimed space: 0B' not in prune_images.stdout"

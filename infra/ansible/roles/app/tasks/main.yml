@@ -1,0 +1,91 @@
+# Docker (como root) usa la cuenta de servicio de la VM para leer de Artifact Registry.
+- name: Autenticar Docker con Artifact Registry
+  ansible.builtin.command:
+    cmd: gcloud auth configure-docker {{ registry_host }} --quiet
+    creates: /root/.docker/config.json
+
+- name: Subir el panel
+  ansible.posix.synchronize:
+    src: "{{ build_dir }}/admin/"
+    dest: "{{ app_dir }}/admin/"
+    delete: true
+    rsync_opts: ["--chmod=D755,F644"]
+
+- name: Carpeta de configuración de nginx
+  ansible.builtin.file:
+    path: "{{ app_dir }}/nginx"
+    state: directory
+    mode: "0755"
+
+- name: Configuración de nginx
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ app_dir }}/nginx/default.conf"
+    mode: "0644"
+  notify: Recargar nginx
+
+- name: compose.yaml
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ app_dir }}/compose.yaml"
+    mode: "0644"
+
+# La API corre como `node` (uid 1000) dentro del contenedor y lee este archivo por bind mount.
+# compose lo pasa como env_file: si cambia, recrea el contenedor.
+- name: Variables de la API
+  ansible.builtin.template:
+    src: api.env.j2
+    dest: "{{ app_dir }}/api.env"
+    owner: root
+    mode: "0600"
+
+- name: Borrar el .dev.vars de la API anterior (wrangler)
+  ansible.builtin.file:
+    path: "{{ app_dir }}/api.dev.vars"
+    state: absent
+
+- name: Migrar la base de D1 al formato de la API en Go
+  ansible.builtin.include_tasks: migrate-d1.yml
+
+- name: Variables del processor
+  ansible.builtin.template:
+    src: processor.env.j2
+    dest: "{{ app_dir }}/processor.env"
+    owner: root
+    mode: "0600"
+
+- name: Cookies de yt-dlp
+  ansible.builtin.copy:
+    dest: "{{ app_dir }}/secrets/cookies.txt"
+    content: "{{ ytdlp_cookies }}"
+    owner: "1000"
+    mode: "0400"
+  when: ytdlp_cookies | length > 0
+  notify: Reiniciar processor
+
+- name: Levantar servicios
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}"
+    pull: always
+    remove_orphans: true
+    recreate: auto
+  register: compose
+
+# Cada pull de `latest` deja sin tag la versión anterior; se borran para no llenar los 30 GB del disco.
+- name: Borrar imágenes viejas en la VM
+  ansible.builtin.command: docker image prune -f
+  register: prune_vm
+  changed_when: "'Total reclaimed space: 0B' not in prune_vm.stdout"
+
+- name: Aplicar reinicios pendientes
+  ansible.builtin.meta: flush_handlers
+
+- name: Esperar a que la API responda por HTTPS
+  ansible.builtin.uri:
+    url: "https://{{ api_domain }}/v1/catalog"
+  delegate_to: localhost
+  become: false
+  register: health
+  until: health.status == 200
+  retries: 20
+  delay: 6

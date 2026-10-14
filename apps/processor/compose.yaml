@@ -1,0 +1,25 @@
+# Processor en Docker para desarrollo local, contra la API de `pnpm dev:api` (puerto 8788 del host).
+#   docker compose -f apps/processor/compose.yaml up --build
+# En apps/api/.env usa PROCESSOR_URL=http://localhost:8790 y el mismo PROCESSOR_SECRET.
+services:
+  processor:
+    build:
+      context: ../..
+      dockerfile: apps/processor/Dockerfile
+    image: soundboard-processor
+    ports:
+      - "8790:8787"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PROCESSOR_SECRET: ${PROCESSOR_SECRET:-local-secret}
+      # La API manda http://localhost:8788, que dentro del contenedor no apunta al host.
+      API_BASE_URL: http://host.docker.internal:8788
+      # Para YouTube con cookies: descomenta el volumen y define YTDLP_COOKIES=/secrets/cookies.txt
+      # YTDLP_COOKIES: /secrets/cookies.txt
+    # volumes:
+    #   - ./cookies.txt:/secrets/cookies.txt:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

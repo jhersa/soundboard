@@ -1,0 +1,9 @@
+# Copia a vault.yml y cifra con: ansible-vault encrypt group_vars/all/vault.yml
+vault_processor_secret: "genera-uno-con-openssl-rand-hex-32"
+# Token de Cloudflare con Zone:DNS:Edit sobre suave.sh (lo usa certbot para el reto DNS-01).
+vault_cloudflare_dns_token: "..."
+vault_google_web_client_id: "XXXX.apps.googleusercontent.com"
+vault_google_client_ids: "WEB.apps.googleusercontent.com,ANDROID.apps.googleusercontent.com"
+# vault_ytdlp_cookies: |
+#   # Netscape HTTP Cookie File
+#   ...

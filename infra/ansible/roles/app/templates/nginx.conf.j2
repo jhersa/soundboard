@@ -1,0 +1,69 @@
+# {{ ansible_managed }}
+# DNS interno de Docker: resuelve `api` en cada petición, así nginx arranca aunque la API no esté lista.
+resolver 127.0.0.11 valid=30s ipv6=off;
+
+ssl_certificate     /etc/letsencrypt/live/{{ base_domain }}/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/{{ base_domain }}/privkey.pem;
+ssl_protocols       TLSv1.2 TLSv1.3;
+ssl_session_cache   shared:SSL:5m;
+server_tokens       off;
+
+server {
+    listen 80 default_server;
+    server_name _;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl default_server;
+    http2 on;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name {{ api_domain }};
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    # Los uploads del panel llegan hasta 50 MB.
+    client_max_body_size 60m;
+
+    # Rutas internas de `wrangler dev` (explorador de D1/R2 con SQL arbitrario, observabilidad).
+    # wrangler ya las rechaza si el Host no es local; esto es una segunda barrera.
+    location /cdn-cgi/ {
+        return 404;
+    }
+
+    location / {
+        set $api http://api:8788;
+        proxy_pass $api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name {{ admin_domain }};
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    root /usr/share/nginx/admin;
+
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        add_header Strict-Transport-Security "max-age=31536000" always;
+    }
+
+    location / {
+        add_header Cache-Control "no-cache";
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        try_files $uri $uri/ /index.html;
+    }
+}

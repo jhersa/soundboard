@@ -1,0 +1,49 @@
+# {{ ansible_managed }}
+name: soundboard
+
+services:
+  nginx:
+    image: nginx:1.29-alpine
+    ports: ["80:80", "443:443"]
+    volumes:
+      # Se monta la carpeta, no el archivo: Ansible reemplaza default.conf (nuevo inode) y un
+      # bind mount de archivo suelto seguiría apuntando al viejo, así que `nginx -s reload` no vería cambios.
+      - ./nginx:/etc/nginx/conf.d:ro
+      - ./letsencrypt:/etc/letsencrypt:ro
+      - ./admin:/usr/share/nginx/admin:ro
+    # Recarga cada 6 h para tomar el certificado renovado por certbot.
+    command: ["/bin/sh", "-c", "while :; do sleep 6h; nginx -s reload; done & exec nginx -g 'daemon off;'"]
+    depends_on: [api]
+    mem_limit: 64m
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/dns-cloudflare
+    volumes:
+      - ./letsencrypt:/etc/letsencrypt
+      - ./secrets/cloudflare.ini:/secrets/cloudflare.ini:ro
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done"]
+    mem_limit: 128m
+    restart: unless-stopped
+
+  api:
+    image: {{ registry }}/api:{{ image_tag }}
+    env_file: [api.env]
+    volumes:
+      - api-data:/data
+    # El binario usa ~6 MB en reposo; el margen es para uploads del panel (hasta 50 MB en memoria).
+    mem_limit: 192m
+    restart: unless-stopped
+
+  processor:
+    image: {{ registry }}/processor:{{ image_tag }}
+    env_file: [processor.env]
+{% if ytdlp_cookies | length > 0 %}
+    volumes:
+      - ./secrets/cookies.txt:/secrets/cookies.txt:ro
+{% endif %}
+    mem_limit: 512m
+    restart: unless-stopped
+
+volumes:
+  api-data:

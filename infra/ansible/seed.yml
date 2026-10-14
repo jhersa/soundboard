@@ -1,0 +1,29 @@
+# Siembra la biblioteca v1 en producción (idempotente: sube con las mismas keys y hace upsert).
+#   ansible-playbook seed.yml --ask-vault-pass
+# Requiere `gcloud auth login` en tu Mac con permiso de escritura sobre el bucket de medios.
+- name: Subir assets v1 a Cloud Storage y generar el SQL
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Ejecutar migrate-v1 contra GCS
+      ansible.builtin.command:
+        cmd: node scripts/migrate-v1.mjs --gcs {{ media_bucket }} --sql-out {{ build_dir }}/seed.sql
+        chdir: "{{ repo_dir }}"
+      changed_when: true
+
+- name: Aplicar el SQL en la base de la VM
+  hosts: soundboard-vm
+  become: true
+  tasks:
+    - name: Copiar seed.sql
+      ansible.builtin.copy:
+        src: "{{ build_dir }}/seed.sql"
+        dest: "{{ app_dir }}/seed.sql"
+        mode: "0644"
+
+    - name: Ejecutar el SQL dentro del contenedor de la API
+      ansible.builtin.shell:
+        cmd: docker compose cp seed.sql api:/tmp/seed.sql && docker compose exec -T api /api sql /tmp/seed.sql
+        chdir: "{{ app_dir }}"
+      changed_when: true

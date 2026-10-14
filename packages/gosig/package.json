@@ -1,0 +1,9 @@
+{
+  "name": "@soundboard/gosig",
+  "private": true,
+  "description": "Firma HMAC entre la API y el processor (Go); estos scripts solo integran `go` con `pnpm test` y `pnpm typecheck`.",
+  "scripts": {
+    "test": "go test ./...",
+    "typecheck": "go vet ./..."
+  }
+}

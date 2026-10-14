@@ -1,0 +1,12 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# Respaldo diario de la base (SQLite en el volumen api-data) a Cloud Storage.
+# Restaurar: ver "Operación" en infra/README.md.
+set -eu
+cd {{ app_dir }}
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+out=$(mktemp)
+trap 'rm -f "$out"' EXIT
+# `api backup -` hace VACUUM INTO (copia consistente aunque la API esté escribiendo) y la escribe en stdout.
+docker compose exec -T api /api backup - > "$out"
+gzip -c "$out" | gcloud storage cp - "gs://{{ backup_bucket }}/db/soundboard-$stamp.sqlite.gz" --quiet

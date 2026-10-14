@@ -1,0 +1,33 @@
+# Wildcard de Let's Encrypt con reto DNS-01 en Cloudflare. La renovación la hace el servicio
+# `certbot` del compose; aquí solo se emite la primera vez (nginx no arranca sin certificado).
+- name: Carpetas de certbot
+  ansible.builtin.file:
+    path: "{{ app_dir }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop: [letsencrypt, secrets]
+
+- name: Credenciales de Cloudflare para certbot
+  ansible.builtin.copy:
+    dest: "{{ app_dir }}/secrets/cloudflare.ini"
+    content: "dns_cloudflare_api_token = {{ cloudflare_dns_token }}\n"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Emitir certificado *.{{ base_domain }}
+  ansible.builtin.command:
+    cmd: >-
+      docker run --rm
+      -v {{ app_dir }}/letsencrypt:/etc/letsencrypt
+      -v {{ app_dir }}/secrets:/secrets:ro
+      certbot/dns-cloudflare certonly --non-interactive --agree-tos
+      -m {{ letsencrypt_email }}
+      --key-type ecdsa
+      --dns-cloudflare --dns-cloudflare-credentials /secrets/cloudflare.ini
+      --dns-cloudflare-propagation-seconds 30
+      --cert-name {{ base_domain }}
+      -d {{ base_domain }} -d *.{{ base_domain }}
+    creates: "{{ app_dir }}/letsencrypt/live/{{ base_domain }}/fullchain.pem"

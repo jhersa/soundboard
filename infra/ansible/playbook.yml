@@ -1,0 +1,19 @@
+# Despliegue completo:
+#   ansible-playbook playbook.yml --ask-vault-pass
+# Solo reconstruir y publicar la app:
+#   ansible-playbook playbook.yml --ask-vault-pass --tags images,app
+- name: Construir imágenes y panel (local)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - { role: images, tags: [images] }
+
+- name: Configurar la VM y levantar Soundboard
+  hosts: soundboard-vm
+  become: true
+  roles:
+    - { role: base, tags: [base] }
+    - { role: certs, tags: [certs] }
+    - { role: app, tags: [app] }
+    - { role: backup, tags: [backup] }

@@ -1,0 +1,26 @@
+# Una sola vez: la API anterior (wrangler) guardaba la base en
+# /data/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite; la de Go usa /data/soundboard.db. Es el
+# mismo esquema SQLite, así que basta copiar el archivo (con su WAL) con la API detenida.
+# El original no se borra: para volver atrás basta con desplegar la imagen anterior.
+- name: Revisar si la base ya está migrada
+  ansible.builtin.command: >-
+    docker run --rm -v {{ api_volume }}:/data busybox:1.37
+    sh -c 'test -f /data/soundboard.db && echo migrada || (ls /data/v3/d1/miniflare-D1DatabaseObject/*.sqlite >/dev/null 2>&1 && echo d1 || echo vacia)'
+  register: d1_state
+  changed_when: false
+
+- name: Detener la API anterior y copiar la base
+  when: d1_state.stdout == "d1"
+  block:
+    - name: Detener la API anterior
+      ansible.builtin.command:
+        cmd: docker compose stop api
+        chdir: "{{ app_dir }}"
+
+    - name: Copiar la base de D1 a /data/soundboard.db
+      ansible.builtin.command: >-
+        docker run --rm -v {{ api_volume }}:/data busybox:1.37 sh -euc '
+        db=$(ls /data/v3/d1/miniflare-D1DatabaseObject/*.sqlite | grep -v /metadata.sqlite);
+        cp "$db" /data/soundboard.db;
+        if [ -f "$db-wal" ]; then cp "$db-wal" /data/soundboard.db-wal; fi;
+        chown 1000:1000 /data/soundboard.db*'

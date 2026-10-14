@@ -18,8 +18,20 @@ pnpm-debug.log*
 # Variables de entorno
 .env
 .env.*
+!.env.example
 
 # Temporales
 *.log
 *.tmp
 tmp/
+
+# Cloudflare / build
+.wrangler/
+.dev.vars
+dist/
+
+# Artefactos de despliegue (imágenes, panel, seed.sql)
+out/
+
+# API en Go: base y medios de desarrollo
+apps/api/.data/

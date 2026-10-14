@@ -1,0 +1,84 @@
+- name: Paquetes base
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, gnupg, unattended-upgrades, chrony, rsync]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# La firma HMAC entre API y processor tolera 300 s de desfase; chrony mantiene el reloj.
+- name: chrony activo
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: true
+
+- name: Swap ({{ swap_size_mb }} MB), imprescindible con 1 GB de RAM
+  ansible.builtin.command:
+    cmd: >-
+      sh -c 'fallocate -l {{ swap_size_mb }}M /swapfile && chmod 600 /swapfile && mkswap /swapfile'
+    creates: /swapfile
+  register: swapfile
+
+- name: Activar swap
+  ansible.builtin.command: swapon /swapfile
+  when: swapfile.changed
+  changed_when: true
+
+- name: Swap persistente
+  ansible.posix.mount:
+    src: /swapfile
+    path: none
+    fstype: swap
+    opts: sw
+    state: present
+
+- name: Preferir RAM sobre swap
+  ansible.posix.sysctl:
+    name: vm.swappiness
+    value: "10"
+    sysctl_set: true
+
+- name: Repositorio de Docker
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: [deb]
+    uris: https://download.docker.com/linux/debian
+    suites: ["{{ ansible_facts['distribution_release'] }}"]
+    components: [stable]
+    architectures: [amd64]
+    signed_by: https://download.docker.com/linux/debian/gpg
+
+- name: Docker Engine y plugin compose
+  ansible.builtin.apt:
+    name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+    state: present
+    update_cache: true
+
+- name: Rotación de logs de Docker
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {"log-driver": "json-file", "log-opts": {"max-size": "10m", "max-file": "3"}}
+    mode: "0644"
+  notify: Reiniciar docker
+
+- name: Docker activo
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Usuario {{ app_user }}
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    groups: [docker]
+    append: true
+    shell: /bin/bash
+
+- name: Carpeta del proyecto
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: "0750"

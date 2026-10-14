@@ -1,0 +1,6 @@
+# La IP y el usuario salen de `tofu output` (o terraform, ver tf_bin), así que hay que aplicar la infraestructura primero.
+all:
+  hosts:
+    soundboard-vm:
+      ansible_host: "{{ lookup('pipe', tf_bin ~ ' -chdir=' ~ tf_dir ~ ' output -raw vm_ip') }}"
+      ansible_user: "{{ lookup('pipe', tf_bin ~ ' -chdir=' ~ tf_dir ~ ' output -raw ssh_user') }}"

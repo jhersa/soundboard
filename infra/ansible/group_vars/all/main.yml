@@ -1,0 +1,38 @@
+# Rutas locales (en tu Mac).
+# CLI con el que se aplicó la infraestructura: tofu o terraform (comparten el mismo estado).
+tf_bin: tofu
+tf_dir: "{{ playbook_dir }}/../terraform"
+repo_dir: "{{ playbook_dir }}/../.."
+build_dir: "{{ repo_dir }}/out"
+
+# Valores que vienen de Terraform.
+tf_output: "{{ lookup('pipe', tf_bin ~ ' -chdir=' ~ tf_dir ~ ' output -json') | from_json }}"
+base_domain: "{{ tf_output.base_domain.value }}"
+cdn_base_url: "{{ tf_output.cdn_base_url.value }}"
+registry: "{{ tf_output.registry.value }}"
+registry_host: "{{ registry.split('/') | first }}"
+media_bucket: "{{ tf_output.media_bucket.value }}"
+backup_bucket: "{{ tf_output.backup_bucket.value }}"
+
+api_domain: "api.{{ base_domain }}"
+admin_domain: "admin.{{ base_domain }}"
+
+# En la VM.
+app_user: compose
+app_dir: "/home/{{ app_user }}/soundboard"
+# Volumen de la base (compose lo nombra <proyecto>_<volumen>).
+api_volume: soundboard_api-data
+image_tag: latest
+swap_size_mb: 2048
+
+letsencrypt_email: jhermosillo@blacklabs.mx
+admin_emails: jhermosillo@blacklabs.mx,jhermosillo.sa@gmail.com
+
+# Secretos: definidos en vault.yml (ansible-vault). Ver vault.yml.example.
+processor_secret: "{{ vault_processor_secret }}"
+cloudflare_dns_token: "{{ vault_cloudflare_dns_token }}"
+# Cliente OAuth web (el del panel) y la lista que acepta la API (web + Android).
+google_web_client_id: "{{ vault_google_web_client_id }}"
+google_client_ids: "{{ vault_google_client_ids }}"
+# Contenido de un cookies.txt para yt-dlp (opcional; YouTube suele bloquear IPs de datacenter).
+ytdlp_cookies: "{{ vault_ytdlp_cookies | default('') }}"

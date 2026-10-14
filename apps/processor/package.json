@@ -1,0 +1,10 @@
+{
+  "name": "@soundboard/processor",
+  "private": true,
+  "description": "Processor en Go; estos scripts solo integran `go` con `pnpm test` y `pnpm typecheck`.",
+  "scripts": {
+    "dev": "go run ./cmd/processor serve",
+    "test": "go test ./...",
+    "typecheck": "go vet ./..."
+  }
+}

@@ -1,0 +1,14 @@
+- name: Script de respaldo
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: /usr/local/bin/soundboard-backup
+    mode: "0750"
+
+# gcloud viene preinstalado en las imágenes Debian de GCE y usa la cuenta de servicio de la VM.
+- name: Respaldo diario a las 09:00 UTC
+  ansible.builtin.cron:
+    name: soundboard-backup
+    minute: "0"
+    hour: "9"
+    job: "/usr/local/bin/soundboard-backup >> /var/log/soundboard-backup.log 2>&1"
+    user: root

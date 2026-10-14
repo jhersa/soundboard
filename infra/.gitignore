@@ -1,0 +1,10 @@
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+terraform/.terraform.tfstate.lock.info
+
+# Ansible
+ansible/group_vars/all/vault.yml
+ansible/*.retry
