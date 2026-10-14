@@ -1,6 +1,6 @@
 - name: Paquetes base
   ansible.builtin.apt:
-    name: [ca-certificates, curl, gnupg, unattended-upgrades, chrony, rsync]
+    name: [ca-certificates, curl, gnupg, unattended-upgrades, chrony, rsync, jq]
     state: present
     update_cache: true
     cache_valid_time: 3600

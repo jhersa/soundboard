@@ -104,6 +104,9 @@ ssh alchemist@$(tofu -chdir=infra/terraform output -raw vm_ip)
 cd /home/compose/soundboard
 sudo docker compose ps
 sudo docker compose logs -f api processor
+# Los logs son JSON (una línea por evento): se filtran con jq
+sudo docker compose logs --no-log-prefix api | jq -c 'select(.level != "INFO")'   # solo avisos y errores
+sudo docker compose logs --no-log-prefix processor | jq -c 'select(.job == "<id>")' # un job
 sudo /usr/local/bin/soundboard-backup          # respaldo manual
 sudo docker compose exec certbot certbot renew --dry-run
 ```

@@ -162,9 +162,10 @@ type statusUpdate struct {
 }
 
 func (s *Server) runJob(ctx context.Context, job ProcessRequest) {
+	start := time.Now()
 	s.Log.Info("procesando", "job", job.JobID, "title", job.Title, "url", job.URL)
 	if err := s.process(ctx, job); err != nil {
-		s.Log.Error("falló", "job", job.JobID, "err", err)
+		s.Log.Error("falló", "job", job.JobID, "ms", time.Since(start).Milliseconds(), "err", err)
 		s.reportFailure(job, err.Error())
 	}
 }
@@ -192,7 +193,7 @@ func (s *Server) process(ctx context.Context, job ProcessRequest) error {
 	if err := s.post(ctx, job, "result", body, contentType); err != nil {
 		return err
 	}
-	s.Log.Info("listo", "job", job.JobID, "segundos", float64(result.DurationMs)/1000)
+	s.Log.Info("listo", "job", job.JobID, "audio_s", float64(result.DurationMs)/1000, "bytes", len(result.Audio))
 	return nil
 }
 

@@ -95,6 +95,20 @@ func (s *Server) cors(next http.Handler) http.Handler {
 	})
 }
 
+// requestLevel: los errores del servidor son Error y los del cliente Warn. El healthcheck de Docker
+// (GET / cada 30 s) baja a Debug: era más de la mitad del log y gastaba la rotación sin aportar nada.
+func requestLevel(r *http.Request, status int) slog.Level {
+	switch {
+	case status >= 500:
+		return slog.LevelError
+	case status >= 400:
+		return slog.LevelWarn
+	case r.Method == http.MethodGet && r.URL.Path == "/":
+		return slog.LevelDebug
+	}
+	return slog.LevelInfo
+}
+
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
@@ -110,8 +124,8 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 		start := time.Now()
 		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(recorder, r)
-		s.Log.Info("petición", "method", r.Method, "path", r.URL.Path, "status", recorder.status,
-			"ms", time.Since(start).Milliseconds())
+		s.Log.Log(r.Context(), requestLevel(r, recorder.status), "petición", "method", r.Method, "path", r.URL.Path,
+			"status", recorder.status, "ms", time.Since(start).Milliseconds())
 	})
 }
 

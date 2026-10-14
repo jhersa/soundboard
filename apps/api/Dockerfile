@@ -25,7 +25,7 @@ COPY --from=build /out/api /api
 COPY --from=build --chown=1000:1000 /out/data /data
 COPY --from=build --chmod=1777 /out/tmp /tmp
 USER 1000:1000
-ENV ADDR=:8788 DATABASE_PATH=/data/soundboard.db
+ENV ADDR=:8788 DATABASE_PATH=/data/soundboard.db LOG_FORMAT=json
 EXPOSE 8788
 VOLUME /data
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["/api", "healthcheck"]

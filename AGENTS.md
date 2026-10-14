@@ -101,6 +101,7 @@ Antes de dar un cambio por terminado, corre `pnpm typecheck` y `pnpm test`.
 - **API:** en local, `apps/api/.env` (copia de `.env.example`, la carga el binario al arrancar). En producción, Ansible genera `api.env` desde `infra/ansible/roles/app/templates/api.env.j2`.
 - **Panel:** `apps/admin/.env.local` guarda `VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID` y `VITE_DEV_TOKEN`.
 - **Processor:** `PROCESSOR_SECRET`, `PORT` (8787), `API_BASE_URL` (en Docker local: `http://host.docker.internal:8788`) y `YTDLP_COOKIES` (opcional). Sin Docker lee `apps/processor/.env`.
+- **Logs (API y processor):** `log/slog` a stderr, configurado por `LOG_FORMAT` (`text` por defecto; las imágenes Docker fijan `json`) y `LOG_LEVEL` (`info` por defecto; `debug` muestra también el healthcheck). Cada evento lleva sus datos como campos (`job`, `status`, `ms`...), no dentro del mensaje. Nunca registres tokens, secretos ni cuerpos de peticiones.
 - No hagas commit de `.env*`, `apps/api/.data/` ni `dist/`.
 
 ## Precauciones

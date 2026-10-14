@@ -33,7 +33,7 @@ import (
 func main() {
 	// En desarrollo se leen las variables de .env; en Docker vienen del entorno.
 	config.LoadDotEnv(".env")
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	logger := loggerFromEnv()
 	command := "serve"
 	if len(os.Args) > 1 {
 		command = os.Args[1]

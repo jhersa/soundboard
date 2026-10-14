@@ -35,7 +35,7 @@ RUN apk add --no-cache ffmpeg libwebp-tools ca-certificates \
   && apk del .fetch
 COPY --from=build /out/processor /usr/local/bin/processor
 COPY --chmod=0755 apps/processor/entrypoint.sh /entrypoint.sh
-ENV PORT=8787
+ENV PORT=8787 LOG_FORMAT=json
 EXPOSE 8787
 USER app
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD ["/usr/local/bin/processor", "healthcheck"]

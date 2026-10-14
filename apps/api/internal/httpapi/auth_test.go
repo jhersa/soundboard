@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -58,5 +60,26 @@ func TestCORS(t *testing.T) {
 	}
 	if res := api.call("GET", "/", nil, ""); res.Body.String() != "soundboard-api" || res.Header().Get("Access-Control-Allow-Origin") != "" {
 		t.Fatalf("raíz: %q %v", res.Body.String(), res.Header())
+	}
+}
+
+func TestNivelDeLogsDePeticiones(t *testing.T) {
+	get := func(path string) *http.Request { return httptest.NewRequest("GET", path, nil) }
+	cases := []struct {
+		name   string
+		r      *http.Request
+		status int
+		want   slog.Level
+	}{
+		{"healthcheck", get("/"), 200, slog.LevelDebug},
+		{"catálogo", get("/v1/catalog"), 200, slog.LevelInfo},
+		{"error del cliente", get("/v1/me"), 401, slog.LevelWarn},
+		{"healthcheck que falla", get("/"), 500, slog.LevelError},
+		{"POST a la raíz", httptest.NewRequest("POST", "/", nil), 200, slog.LevelInfo},
+	}
+	for _, tc := range cases {
+		if got := requestLevel(tc.r, tc.status); got != tc.want {
+			t.Errorf("%s: %v; se esperaba %v", tc.name, got, tc.want)
+		}
 	}
 }
