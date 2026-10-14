@@ -8,6 +8,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"soundboard/api/internal/db"
 
 	"soundboard/api/internal/storage"
 	signature "soundboard/gosig"
@@ -274,5 +277,110 @@ func TestReprocesarMismoAudio(t *testing.T) {
 	res := api.signedCall("/v1/internal/jobs/"+job.ID+"/result", body, contentType)
 	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "image/bmp") {
 		t.Fatalf("imagen no soportada: %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestAdminBorraJobs(t *testing.T) {
+	api := newTestAPI(t)
+	token := api.adminToken()
+	setUpdatedAt := func(id, value string) {
+		if _, err := api.server.DB.Exec("UPDATE jobs SET updated_at = ? WHERE id = ?", value, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	create := func(body any) JobDTO {
+		var job JobDTO
+		api.call("POST", "/v1/admin/jobs", body, token).decode(t, &job)
+		return job
+	}
+	remaining := func() []string {
+		var ids []string
+		for _, job := range api.jobs(token) {
+			ids = append(ids, job.ID)
+		}
+		return ids
+	}
+
+	// Fallido (el processor no responde): se puede borrar y desaparece de la lista.
+	api.processor.status = 0
+	failed := create(map[string]string{"url": "https://a.test/x", "title": "Fallido"})
+	if res := api.call("DELETE", "/v1/admin/jobs/"+failed.ID, nil, token); res.Code != http.StatusNoContent {
+		t.Fatalf("borrar fallido: %d %s", res.Code, res.Body.String())
+	}
+	if len(remaining()) != 0 {
+		t.Fatalf("el job borrado sigue en la lista: %v", remaining())
+	}
+	if res := api.call("DELETE", "/v1/admin/jobs/"+failed.ID, nil, token); res.Code != http.StatusNotFound {
+		t.Fatalf("borrar dos veces: %d", res.Code)
+	}
+
+	// Terminado: se borra el registro, pero el sonido publicado se queda.
+	api.processor.status = http.StatusAccepted
+	done := create(map[string]string{"url": "https://a.test/x", "title": "Listo"})
+	body, contentType := multipartBody(t, map[string]string{"meta": `{"durationMs":10}`}, filePart{"audio", "a.ogg", "audio/ogg", []byte("ogg")})
+	if res := api.signedCall("/v1/internal/jobs/"+done.ID+"/result", body, contentType); res.Code != http.StatusOK {
+		t.Fatalf("result: %d", res.Code)
+	}
+	if res := api.call("DELETE", "/v1/admin/jobs/"+done.ID, nil, token); res.Code != http.StatusNoContent {
+		t.Fatalf("borrar terminado: %d", res.Code)
+	}
+	var catalog CatalogPage
+	api.call("GET", "/v1/catalog", nil, "").decode(t, &catalog)
+	if len(catalog.Items) != 1 || catalog.Items[0].Title != "Listo" {
+		t.Fatalf("el sonido debía conservarse: %+v", catalog.Items)
+	}
+
+	// En cola o procesando: se rechaza con un motivo, salvo que lleve más de 30 minutos sin cambios.
+	queued := create(map[string]string{"url": "https://a.test/y", "title": "En cola"})
+	running := create(map[string]string{"url": "https://a.test/z", "title": "Procesando"})
+	api.signedCall("/v1/internal/jobs/"+running.ID+"/status", []byte(`{"status":"running"}`), "application/json")
+	for _, id := range []string{queued.ID, running.ID} {
+		res := api.call("DELETE", "/v1/admin/jobs/"+id, nil, token)
+		if res.Code != http.StatusConflict || !strings.Contains(res.Body.String(), "sigue en proceso") {
+			t.Fatalf("job activo: %d %s", res.Code, res.Body.String())
+		}
+	}
+	setUpdatedAt(queued.ID, db.Now()) // recién actualizado: sigue protegido
+	setUpdatedAt(running.ID, api.server.now().Add(-31*time.Minute).UTC().Format(db.TimeFormat))
+	if res := api.call("DELETE", "/v1/admin/jobs/"+running.ID, nil, token); res.Code != http.StatusNoContent {
+		t.Fatalf("job atascado: %d %s", res.Code, res.Body.String())
+	}
+	if res := api.call("DELETE", "/v1/admin/jobs/"+queued.ID, nil, token); res.Code != http.StatusConflict {
+		t.Fatalf("job en cola reciente: %d", res.Code)
+	}
+
+	// Solo admins.
+	user := api.signIn("user", "user@example.com").Token
+	if res := api.call("DELETE", "/v1/admin/jobs/"+queued.ID, nil, user); res.Code != http.StatusForbidden {
+		t.Fatalf("usuario normal: %d", res.Code)
+	}
+	if res := api.call("DELETE", "/v1/admin/jobs/"+queued.ID, nil, ""); res.Code != http.StatusUnauthorized {
+		t.Fatalf("sin sesión: %d", res.Code)
+	}
+}
+
+// Los uploads de un job fallido se borran junto con él (los de uno exitoso ya se borran solos).
+func TestAdminBorrarJobFallidoLimpiaSusUploads(t *testing.T) {
+	api := newTestAPI(t)
+	token := api.adminToken()
+	api.processor.status = 0
+	upload := func(name, contentType string) string {
+		body, header := multipartBody(t, nil, filePart{"file", name, contentType, []byte("x")})
+		var uploaded struct{ URL string }
+		api.call("POST", "/v1/admin/uploads", body, token, "Content-Type", header).decode(t, &uploaded)
+		return uploaded.URL
+	}
+	audio, image := upload("a.mp3", "audio/mpeg"), upload("i.png", "image/png")
+	var job JobDTO
+	api.call("POST", "/v1/admin/jobs", map[string]string{"url": audio, "imageUrl": image, "title": "X"}, token).decode(t, &job)
+	audioKey, imageKey := strings.TrimPrefix(audio, "upload:"), strings.TrimPrefix(image, "upload:")
+	if !api.exists(audioKey) || !api.exists(imageKey) {
+		t.Fatal("los uploads debían existir antes de borrar")
+	}
+	if res := api.call("DELETE", "/v1/admin/jobs/"+job.ID, nil, token); res.Code != http.StatusNoContent {
+		t.Fatalf("borrar: %d", res.Code)
+	}
+	if api.exists(audioKey) || api.exists(imageKey) {
+		t.Fatal("los uploads debían borrarse con el job")
 	}
 }

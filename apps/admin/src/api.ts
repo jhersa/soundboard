@@ -44,6 +44,7 @@ export const api = {
   jobs: () => request<{ items: JobDto[] }>("/admin/jobs").then((page) => page.items),
   createJob: (job: CreateJobRequest) => request<JobDto>("/admin/jobs", { method: "POST", body: JSON.stringify(job) }),
   retryJob: (id: string) => request<JobDto>(`/admin/jobs/${id}/retry`, { method: "POST" }),
+  deleteJob: (id: string) => request<void>(`/admin/jobs/${id}`, { method: "DELETE" }),
   upload: (file: File) => {
     const form = new FormData();
     form.set("file", file);

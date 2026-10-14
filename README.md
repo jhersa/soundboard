@@ -44,6 +44,7 @@ El processor no tiene credenciales del almacén de medios. Le manda el `.ogg` y 
 | PUT | `/me/library/order` | usuario | `{ids}` en el nuevo orden |
 | POST / GET | `/admin/jobs` | admin | Crear job (`url`, `title`, `imageUrl`, `from`, `to`, `stereo`) / listar |
 | POST | `/admin/jobs/:id/retry` | admin | Reintentar un job fallido |
+| DELETE | `/admin/jobs/:id` | admin | Borrar un job terminado o fallido (y sus uploads); uno en cola o procesando solo si lleva más de 30 min sin cambios. No borra el sonido publicado |
 | POST | `/admin/uploads` | admin | Subir un archivo cuando yt-dlp no puede bajar el link; devuelve `upload:<key>` |
 | GET / PATCH / DELETE | `/admin/sounds[/:id]` | admin | Listar, renombrar, ocultar/publicar, borrar |
 

@@ -63,6 +63,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/admin/jobs", s.handle(s.admin(s.createJob)))
 	mux.HandleFunc("GET /v1/admin/jobs", s.handle(s.admin(s.listJobs)))
 	mux.HandleFunc("POST /v1/admin/jobs/{id}/retry", s.handle(s.admin(s.retryJob)))
+	mux.HandleFunc("DELETE /v1/admin/jobs/{id}", s.handle(s.admin(s.deleteJob)))
 	mux.HandleFunc("GET /v1/admin/sounds", s.handle(s.admin(s.listSounds)))
 	mux.HandleFunc("PATCH /v1/admin/sounds/{id}", s.handle(s.admin(s.updateSound)))
 	mux.HandleFunc("DELETE /v1/admin/sounds/{id}", s.handle(s.admin(s.deleteSound)))

@@ -7,11 +7,17 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
+	"soundboard/api/internal/db"
 	"soundboard/api/internal/storage"
 )
+
+// Un job en cola o procesando sin cambios por más de esto se considera atascado (p. ej. el processor
+// se reinició y perdió su cola) y ya se puede borrar. El panel replica este valor en JobsList.vue.
+const stuckJobAge = 30 * time.Minute
 
 var extensionPattern = regexp.MustCompile(`(?i)\.([a-z0-9]{1,5})$`)
 
@@ -119,6 +125,53 @@ func (s *Server) retryJob(w http.ResponseWriter, r *http.Request) error {
 	}
 	s.dispatchJob(job, requestOrigin(r))
 	return writeJSON(w, http.StatusAccepted, job.dto())
+}
+
+// deleteJob borra el registro de un job y los archivos subidos que quedaron asociados. No toca el
+// sonido que haya publicado. Solo se borran jobs terminados o fallidos; uno en cola o procesando
+// únicamente si está atascado: si no, el processor terminaría de trabajar para un job que ya no existe.
+func (s *Server) deleteJob(w http.ResponseWriter, r *http.Request) error {
+	id := r.PathValue("id")
+	var status, updatedAt string
+	err := s.DB.QueryRowContext(r.Context(), "SELECT status, updated_at FROM jobs WHERE id = ?", id).Scan(&status, &updatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fail(http.StatusNotFound, "Job no encontrado")
+	}
+	if err != nil {
+		return err
+	}
+	if status == "queued" || status == "running" {
+		changed, err := time.Parse(db.TimeFormat, updatedAt)
+		if err != nil || s.now().Sub(changed) < stuckJobAge {
+			return fail(http.StatusConflict, "El job sigue en proceso; espera a que termine o falle")
+		}
+	}
+
+	// El estado va en el WHERE por si el job cambió entre la lectura y el borrado.
+	var sourceURL string
+	var imageURL *string
+	err = s.DB.QueryRowContext(r.Context(), "DELETE FROM jobs WHERE id = ? AND status = ? RETURNING source_url, image_url", id, status).
+		Scan(&sourceURL, &imageURL)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fail(http.StatusConflict, "El job cambió de estado; recarga la lista")
+	}
+	if err != nil {
+		return err
+	}
+
+	// Los uploads solo se borran solos cuando el job termina bien; los de uno fallido se limpian aquí
+	// (y, en Cloud Storage, por la regla de ciclo de vida de uploads/). Si falla, el job ya se borró.
+	var uploads []string
+	for _, url := range []*string{&sourceURL, imageURL} {
+		if key, ok := uploadKey(url); ok {
+			uploads = append(uploads, key)
+		}
+	}
+	if err := s.Store.Delete(r.Context(), uploads...); err != nil {
+		s.Log.Warn("no se pudieron borrar los uploads del job", "job", id, "err", err)
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
 func (s *Server) listSounds(w http.ResponseWriter, r *http.Request) error {
