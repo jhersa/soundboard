@@ -35,6 +35,7 @@ async function signOut() {
   </main>
   <main v-else>
     <header>
+      <img class="logo" src="/icon-192.png" alt="" />
       <h1>Soundboard Admin</h1>
       <span class="muted">{{ user.email }}</span>
       <button class="link" @click="signOut">Cerrar sesión</button>

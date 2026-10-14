@@ -80,7 +80,7 @@ Lee `tokens.json` y genera lo que haga falta; agrega un emisor en `scripts/build
 
 ## Notas y deuda conocida
 
-- **Panel admin sin migrar:** `apps/admin/src/styles.css` usa una paleta distinta (violeta Material `#6750a4`, fondo `#131316`) y no la de la app. Para alinearlo, importa `tokens.css` y reemplaza sus variables (`--bg` → `--color-background`, `--surface`, `--text`, `--muted`, `--border`, `--accent`, `--danger`, `--ok`).
+- **Panel admin:** ya usa esta identidad. `apps/admin/src/main.ts` importa `generated/tokens.css` tal cual (sin copiarlo), `vite.config.ts` usa `assets/web` como `publicDir` y su Dockerfile copia ambos. Para cambiar los colores del panel, edita `tokens.json` y corre `pnpm brand:build`; `apps/admin/src/styles.css` solo usa variables `--color-*`.
 - **La app Android aún usa la paleta anterior** (menta/violeta suave, fondo `#0D0E12`). Los tokens ya son los vibrantes; falta copiar `generated/android/*.kt` a `core/ui`. Además, `onPrimary` pasó a negro en el tema claro (antes blanco, 2.4:1; ahora ≈8.8:1 sobre `#C7A500`).
 - **Origen de los acentos:** salen del tema Laetus (`10f.laetus`, variante Black). El `outline` `#2E2E2E` y el gris de texto secundario `#A0A09A` no existen en el tema (sus bordes son casi invisibles y su gris de comentarios no llega a AA); se derivaron para que la UI sea legible.
 - **Logo SVG con raster:** `logo-square.svg` y `logo-circle.svg` referencian `vinyl-background.png` por ruta relativa; cópialos juntos. El vinilo solo existe como PNG de 432 px (no hay vector), por eso los PNG de 1024 son una ampliación suave del fondo; la jirafa sí es vectorial.

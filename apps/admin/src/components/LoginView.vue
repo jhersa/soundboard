@@ -28,7 +28,12 @@ onMounted(() => {
         }
       },
     });
-    window.google.accounts.id.renderButton(buttonEl.value, { theme: "filled_black", size: "large", locale: "es" });
+    window.google.accounts.id.renderButton(buttonEl.value, {
+      // Sigue el tema del sistema, igual que el resto del panel.
+      theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "filled_black" : "outline",
+      size: "large",
+      locale: "es",
+    });
   }, 100);
 });
 
@@ -37,6 +42,7 @@ onUnmounted(() => clearInterval(timer));
 
 <template>
   <main class="center">
+    <img class="logo" src="/icon-192.png" alt="" />
     <h1>Soundboard Admin</h1>
     <div ref="buttonEl" />
     <p v-if="error" class="error">{{ error }}</p>

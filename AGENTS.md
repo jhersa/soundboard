@@ -15,6 +15,7 @@ apps/api/         API en Go (net/http + SQLite con modernc.org/sqlite, sin CGO).
   internal/db/       SQLite y migraciones (tabla d1_migrations, heredada de D1)
   migrations/     SQL numerado (0001_init.sql, ...), embebido en el binario
 apps/admin/       Panel admin: Vue 3 (<script setup>) + Vite. Componentes en src/components/
+                  Estilos solo con variables `--color-*` de brand/ (importa brand/generated/tokens.css); no definas colores en styles.css
 apps/processor/   Processor en Go: servidor HTTP + cola de un job a la vez + pipeline que ejecuta yt-dlp, ffmpeg y cwebp
   cmd/processor/  binario: serve | healthcheck
   internal/server/    POST /process (firmado), cola, reporte de status y result a la API

@@ -16,6 +16,9 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter @soundboard/admin...
 COPY packages/shared packages/shared
 COPY apps/admin apps/admin
+# Identidad visual: tokens.css se importa desde src/main.ts y los favicons son el publicDir de Vite.
+COPY brand/generated/tokens.css brand/generated/tokens.css
+COPY brand/assets/web brand/assets/web
 ARG VITE_API_URL
 ARG VITE_GOOGLE_CLIENT_ID
 RUN test -n "$VITE_API_URL" && test -n "$VITE_GOOGLE_CLIENT_ID" \
