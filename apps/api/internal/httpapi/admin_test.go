@@ -384,3 +384,158 @@ func TestAdminBorrarJobFallidoLimpiaSusUploads(t *testing.T) {
 		t.Fatal("los uploads debían borrarse con el job")
 	}
 }
+
+// replaceJob crea un job que reemplaza a `oldID` y entrega su resultado como lo haría el processor.
+func (a *testAPI) replaceJob(token, oldID, title string, audio []byte, image *filePart) (JobDTO, string) {
+	a.t.Helper()
+	var job JobDTO
+	created := a.call("POST", "/v1/admin/jobs", map[string]string{"url": "https://a.test/x", "title": title, "replacesSoundId": oldID}, token)
+	if created.Code != http.StatusAccepted {
+		a.t.Fatalf("crear job: %d %s", created.Code, created.Body.String())
+	}
+	created.decode(a.t, &job)
+	files := []filePart{{"audio", "a.ogg", "audio/ogg", audio}}
+	if image != nil {
+		files = append(files, *image)
+	}
+	body, contentType := multipartBody(a.t, map[string]string{"meta": `{"durationMs":8800}`}, files...)
+	if res := a.signedCall("/v1/internal/jobs/"+job.ID+"/result", body, contentType); res.Code != http.StatusOK {
+		a.t.Fatalf("result: %d %s", res.Code, res.Body.String())
+	}
+	return job, signature.SHA256Hex(audio)
+}
+
+func (a *testAPI) putFiles(keys ...string) {
+	a.t.Helper()
+	for _, key := range keys {
+		if err := a.store.Put(context.Background(), key, []byte(key), storage.PutOptions{}); err != nil {
+			a.t.Fatal(err)
+		}
+	}
+}
+
+func TestReemplazarAudioConservaBibliotecasYCatalogo(t *testing.T) {
+	api := newTestAPI(t)
+	token := api.adminToken()
+	oldID, otherID := soundID("a"), soundID("b")
+	api.seedSound(oldID, "1500", "", "2020-01-01T00:00:00.000Z")
+	api.seedSound(otherID, "otro", "", "")
+	api.putFiles("sounds/"+oldID+".ogg", "images/"+oldID+".gif")
+
+	first := api.signIn("uno", "uno@example.com").Token
+	second := api.signIn("dos", "dos@example.com").Token
+	for _, id := range []string{otherID, oldID} {
+		api.call("PUT", "/v1/me/library/"+id, nil, first)
+	}
+	api.call("PUT", "/v1/me/library/"+oldID, nil, second)
+
+	job, newID := api.replaceJob(token, oldID, "1500 recortado", []byte("audio nuevo"), nil)
+	if job.ReplacesSoundID == nil || *job.ReplacesSoundID != oldID {
+		t.Fatalf("job: %+v", job)
+	}
+
+	// El nuevo ocupa el mismo lugar en cada biblioteca.
+	soundIDs := func(token string) []string {
+		var library LibraryDTO
+		api.call("GET", "/v1/me/library", nil, token).decode(t, &library)
+		return titles(library.Items, func(item SoundDTO) string { return item.ID })
+	}
+	if got := soundIDs(first); len(got) != 2 || got[0] != otherID || got[1] != newID {
+		t.Fatalf("biblioteca uno: %v", got)
+	}
+	if got := soundIDs(second); len(got) != 1 || got[0] != newID {
+		t.Fatalf("biblioteca dos: %v", got)
+	}
+
+	// Hereda fecha e imagen; el viejo desaparece con su audio, pero no con la imagen que heredó.
+	var sounds struct{ Items []AdminSoundDTO }
+	api.call("GET", "/v1/admin/sounds", nil, token).decode(t, &sounds)
+	var replaced *AdminSoundDTO
+	for i, sound := range sounds.Items {
+		if sound.ID == oldID {
+			t.Fatal("el sonido viejo debió borrarse")
+		}
+		if sound.ID == newID {
+			replaced = &sounds.Items[i]
+		}
+	}
+	if replaced == nil || replaced.Title != "1500 recortado" || replaced.Status != "published" ||
+		replaced.CreatedAt != "2020-01-01T00:00:00.000Z" || replaced.DurationMs != 8800 ||
+		replaced.ImageURL == nil || *replaced.ImageURL != "https://cdn.test/images/"+oldID+".gif" || !replaced.IsGif {
+		t.Fatalf("sonido nuevo: %+v", replaced)
+	}
+	if api.exists("sounds/"+oldID+".ogg") || !api.exists("images/"+oldID+".gif") || !api.exists("sounds/"+newID+".ogg") {
+		t.Fatal("archivos tras reemplazar")
+	}
+
+	// Reintentar cuando el viejo ya no existe solo vuelve a guardar el nuevo.
+	api.replaceJobResult(job.ID, []byte("audio nuevo"))
+	if got := soundIDs(first); len(got) != 2 || got[1] != newID {
+		t.Fatalf("tras reintento: %v", got)
+	}
+}
+
+func (a *testAPI) replaceJobResult(jobID string, audio []byte) {
+	a.t.Helper()
+	body, contentType := multipartBody(a.t, map[string]string{"meta": `{"durationMs":8800}`}, filePart{"audio", "a.ogg", "audio/ogg", audio})
+	if res := a.signedCall("/v1/internal/jobs/"+jobID+"/result", body, contentType); res.Code != http.StatusOK {
+		a.t.Fatalf("result: %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestReemplazarAudioConImagenNuevaYConflictos(t *testing.T) {
+	api := newTestAPI(t)
+	token := api.adminToken()
+	oldID := soundID("a")
+	audio := []byte("audio nuevo")
+	newID := signature.SHA256Hex(audio)
+	api.seedSound(oldID, "viejo", "", "")
+	api.seedSound(newID, "ya existía", "", "")
+	api.putFiles("sounds/"+oldID+".ogg", "images/"+oldID+".gif")
+
+	// Quien ya tenía los dos conserva el nuevo en su posición y solo pierde el viejo.
+	user := api.signIn("uno", "uno@example.com").Token
+	for _, id := range []string{oldID, newID} {
+		api.call("PUT", "/v1/me/library/"+id, nil, user)
+	}
+	api.replaceJob(token, oldID, "nuevo", audio, &filePart{"image", "a.png", "image/png", []byte("png")})
+
+	var library LibraryDTO
+	api.call("GET", "/v1/me/library", nil, user).decode(t, &library)
+	if len(library.Items) != 1 || library.Items[0].ID != newID || library.Items[0].Title != "nuevo" ||
+		library.Items[0].ImageURL == nil || *library.Items[0].ImageURL != "https://cdn.test/images/"+newID+".png" {
+		t.Fatalf("biblioteca: %+v", library.Items)
+	}
+	if api.exists("images/"+oldID+".gif") || api.exists("sounds/"+oldID+".ogg") {
+		t.Fatal("los archivos del viejo debieron borrarse")
+	}
+}
+
+func TestReemplazarAudioValidaElSonido(t *testing.T) {
+	api := newTestAPI(t)
+	token := api.adminToken()
+	if res := api.call("POST", "/v1/admin/jobs", `{"url":"https://a.test/x","title":"X","replacesSoundId":"abc"}`, token); res.Code != http.StatusBadRequest {
+		t.Fatalf("id inválido: %d %s", res.Code, res.Body.String())
+	}
+	res := api.call("POST", "/v1/admin/jobs", `{"url":"https://a.test/x","title":"X","replacesSoundId":"`+soundID("f")+`"}`, token)
+	if res.Code != http.StatusNotFound || len(api.processor.requests) != 0 {
+		t.Fatalf("sonido inexistente: %d %s", res.Code, res.Body.String())
+	}
+	var job JobDTO
+	api.call("POST", "/v1/admin/jobs", `{"url":"https://a.test/x","title":"X"}`, token).decode(t, &job)
+	if job.ReplacesSoundID != nil {
+		t.Fatalf("un job normal no reemplaza: %+v", job)
+	}
+}
+
+func TestReemplazarAudioConservaElEstadoOculto(t *testing.T) {
+	api := newTestAPI(t)
+	token := api.adminToken()
+	api.seedSound(soundID("a"), "oculto", "hidden", "")
+	_, newID := api.replaceJob(token, soundID("a"), "oculto", []byte("audio nuevo"), nil)
+	var sounds struct{ Items []AdminSoundDTO }
+	api.call("GET", "/v1/admin/sounds", nil, token).decode(t, &sounds)
+	if len(sounds.Items) != 1 || sounds.Items[0].ID != newID || sounds.Items[0].Status != "hidden" {
+		t.Fatalf("sonidos: %+v", sounds.Items)
+	}
+}

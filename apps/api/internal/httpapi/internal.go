@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -159,7 +160,12 @@ func (s *Server) jobResult(w http.ResponseWriter, r *http.Request) error {
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	if _, err := s.DB.ExecContext(ctx,
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO sounds (id, title, duration_ms, audio_key, image_key, image_type) VALUES (?, ?, ?, ?, ?, ?)
 		 ON CONFLICT (id) DO UPDATE SET title = excluded.title, duration_ms = excluded.duration_ms,
 		   audio_key = excluded.audio_key,
@@ -168,10 +174,23 @@ func (s *Server) jobResult(w http.ResponseWriter, r *http.Request) error {
 		soundID, job.Title, int64(meta.DurationMs), audioKey, imageKey, imageType); err != nil {
 		return err
 	}
+	var unused []string
 	if imageKey != nil && previousImage != nil && *previousImage != *imageKey {
-		if err := s.Store.Delete(ctx, *previousImage); err != nil {
+		unused = append(unused, *previousImage)
+	}
+	if job.ReplacesSoundID != nil && *job.ReplacesSoundID != soundID {
+		replaced, err := replaceSound(ctx, tx, *job.ReplacesSoundID, soundID)
+		if err != nil {
 			return err
 		}
+		unused = append(unused, replaced...)
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	// Los archivos se borran después del commit: si algo falla antes, el sonido viejo sigue completo.
+	if err := s.Store.Delete(ctx, unused...); err != nil {
+		return err
 	}
 
 	if err := s.setJobStatus(ctx, job.ID, "done", nil, &soundID); err != nil {
@@ -187,6 +206,44 @@ func (s *Server) jobResult(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return writeJSON(w, http.StatusOK, map[string]string{"soundId": soundID})
+}
+
+// replaceSound le pasa al sonido nuevo el lugar del viejo: su estado, su fecha (y con ella su
+// posición en el catálogo), su imagen si el job no trajo otra y su posición en cada biblioteca.
+// Después borra el viejo y devuelve sus archivos que quedaron sin uso.
+func replaceSound(ctx context.Context, tx *sql.Tx, oldID, newID string) ([]string, error) {
+	old, err := scanSound(tx.QueryRowContext(ctx, "SELECT "+soundColumns+" FROM sounds WHERE id = ?", oldID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil // Ya se reemplazó o se borró (por ejemplo, al reintentar el job).
+	}
+	if err != nil {
+		return nil, err
+	}
+	// En SQLite, cada SET usa los valores de la fila antes del UPDATE.
+	var newImage *string
+	if err := tx.QueryRowContext(ctx,
+		`UPDATE sounds SET status = ?, created_at = ?,
+		   image_type = CASE WHEN image_key IS NULL THEN ? ELSE image_type END,
+		   image_key = COALESCE(image_key, ?)
+		 WHERE id = ? RETURNING image_key`,
+		old.Status, old.CreatedAt, old.ImageType, old.ImageKey, newID).Scan(&newImage); err != nil {
+		return nil, err
+	}
+	// Si alguien ya tenía el sonido nuevo, conserva el que tenía y solo pierde el viejo.
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO user_sounds (user_id, sound_id, position, added_at)
+		 SELECT user_id, ?, position, added_at FROM user_sounds WHERE sound_id = ?
+		 ON CONFLICT (user_id, sound_id) DO NOTHING`, newID, oldID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM sounds WHERE id = ?", oldID); err != nil {
+		return nil, err
+	}
+	unused := []string{old.AudioKey}
+	if old.ImageKey != nil && (newImage == nil || *newImage != *old.ImageKey) {
+		unused = append(unused, *old.ImageKey)
+	}
+	return unused, nil
 }
 
 func parseMultipart(contentType string, body []byte) (*multipart.Form, error) {

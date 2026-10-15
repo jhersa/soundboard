@@ -46,6 +46,7 @@ async function remove(job: JobDto) {
       <li v-for="job in jobs.slice(0, 10)" :key="job.id" class="job" :class="job.status">
         <strong>{{ job.title }}</strong>
         <span class="badge">{{ STATUS_LABELS[job.status] }}</span>
+        <span v-if="job.replacesSoundId" class="muted">reemplazo</span>
         <span class="muted ellipsis">{{ job.sourceUrl }}</span>
         <pre v-if="job.error" class="error">{{ job.error }}</pre>
         <button v-if="job.status === 'failed'" class="link" @click="retry(job)">Reintentar</button>

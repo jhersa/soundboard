@@ -71,10 +71,21 @@ func (s *Server) createJob(w http.ResponseWriter, r *http.Request) error {
 	if request.Stereo != nil && *request.Stereo {
 		stereo = 1
 	}
+	if request.ReplacesSoundID != nil {
+		var exists int
+		if err := s.DB.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM sounds WHERE id = ?", *request.ReplacesSoundID).
+			Scan(&exists); err != nil {
+			return err
+		}
+		if exists == 0 {
+			return fail(http.StatusNotFound, "Sonido a reemplazar no encontrado")
+		}
+	}
 	job, err := scanJob(s.DB.QueryRowContext(r.Context(),
-		`INSERT INTO jobs (id, source_url, image_url, title, trim_from, trim_to, stereo)
-		 VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING `+jobColumns,
-		uuid.NewString(), *request.URL, request.ImageURL, *request.Title, request.From, request.To, stereo))
+		`INSERT INTO jobs (id, source_url, image_url, title, trim_from, trim_to, stereo, replaces_sound_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING `+jobColumns,
+		uuid.NewString(), *request.URL, request.ImageURL, *request.Title, request.From, request.To, stereo,
+		request.ReplacesSoundID))
 	if err != nil {
 		return err
 	}

@@ -58,8 +58,10 @@ type JobDTO struct {
 	Status    string  `json:"status"`
 	Error     *string `json:"error"`
 	SoundID   *string `json:"soundId"`
-	CreatedAt string  `json:"createdAt"`
-	UpdatedAt string  `json:"updatedAt"`
+	// ReplacesSoundID es el sonido que este job reemplaza al terminar (null si crea uno nuevo).
+	ReplacesSoundID *string `json:"replacesSoundId"`
+	CreatedAt       string  `json:"createdAt"`
+	UpdatedAt       string  `json:"updatedAt"`
 }
 
 // ProcessRequest es lo que la API manda al processor (POST /process). Los opcionales se omiten,
@@ -80,7 +82,7 @@ type ProcessRequest struct {
 const (
 	soundColumns       = "id, title, duration_ms, audio_key, image_key, image_type, status, created_at"
 	prefixedSoundCols  = "s.id, s.title, s.duration_ms, s.audio_key, s.image_key, s.image_type, s.status, s.created_at"
-	jobColumns         = "id, source_url, image_url, title, trim_from, trim_to, stereo, status, error, sound_id, created_at, updated_at"
+	jobColumns         = "id, source_url, image_url, title, trim_from, trim_to, stereo, status, error, sound_id, replaces_sound_id, created_at, updated_at"
 	immutableCache     = "public, max-age=31536000, immutable"
 	audioContentType   = "audio/ogg"
 	uploadScheme       = "upload:"
@@ -138,30 +140,31 @@ func (row soundRow) adminDTO(cdnBase string) AdminSoundDTO {
 }
 
 type jobRow struct {
-	ID        string
-	SourceURL string
-	ImageURL  *string
-	Title     string
-	TrimFrom  *string
-	TrimTo    *string
-	Stereo    int
-	Status    string
-	Error     *string
-	SoundID   *string
-	CreatedAt string
-	UpdatedAt string
+	ID              string
+	SourceURL       string
+	ImageURL        *string
+	Title           string
+	TrimFrom        *string
+	TrimTo          *string
+	Stereo          int
+	Status          string
+	Error           *string
+	SoundID         *string
+	ReplacesSoundID *string
+	CreatedAt       string
+	UpdatedAt       string
 }
 
 func scanJob(row scanner) (jobRow, error) {
 	var j jobRow
 	return j, row.Scan(&j.ID, &j.SourceURL, &j.ImageURL, &j.Title, &j.TrimFrom, &j.TrimTo, &j.Stereo, &j.Status,
-		&j.Error, &j.SoundID, &j.CreatedAt, &j.UpdatedAt)
+		&j.Error, &j.SoundID, &j.ReplacesSoundID, &j.CreatedAt, &j.UpdatedAt)
 }
 
 func (j jobRow) dto() JobDTO {
 	return JobDTO{
 		ID: j.ID, SourceURL: j.SourceURL, ImageURL: j.ImageURL, Title: j.Title, From: j.TrimFrom, To: j.TrimTo,
 		Stereo: j.Stereo == 1, Status: j.Status, Error: j.Error, SoundID: j.SoundID,
-		CreatedAt: j.CreatedAt, UpdatedAt: j.UpdatedAt,
+		ReplacesSoundID: j.ReplacesSoundID, CreatedAt: j.CreatedAt, UpdatedAt: j.UpdatedAt,
 	}
 }

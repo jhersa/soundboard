@@ -4,7 +4,7 @@ import { computed, ref } from "vue";
 import { api } from "../api";
 
 const props = defineProps<{ sounds: AdminSoundDto[] }>();
-const emit = defineEmits<{ changed: [] }>();
+const emit = defineEmits<{ changed: []; replace: [sound: AdminSoundDto] }>();
 
 const filter = ref("");
 const visible = computed(() =>
@@ -47,6 +47,7 @@ async function remove(sound: AdminSoundDto) {
         <audio :src="sound.audioUrl" controls preload="none" />
         <div class="actions">
           <button class="link" @click="rename(sound)">Renombrar</button>
+          <button class="link" @click="emit('replace', sound)">Reemplazar audio</button>
           <button class="link" @click="toggle(sound)">{{ sound.status === "published" ? "Ocultar" : "Publicar" }}</button>
           <button class="link danger" @click="remove(sound)">Borrar</button>
         </div>

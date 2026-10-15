@@ -60,6 +60,9 @@ export const CreateJobRequest = z.object({
   from: TrimTime.optional(),
   to: TrimTime.optional(),
   stereo: z.boolean().default(false),
+  // Reemplaza el audio de ese sonido: al terminar, el nuevo toma su lugar en el catálogo y en las
+  // bibliotecas (y su imagen si el job no trae otra), y el viejo se borra.
+  replacesSoundId: SoundId.optional(),
 });
 export type CreateJobRequest = z.infer<typeof CreateJobRequest>;
 
@@ -76,6 +79,7 @@ export interface JobDto {
   status: JobStatus;
   error: string | null;
   soundId: string | null;
+  replacesSoundId: string | null;
   createdAt: string;
   updatedAt: string;
 }

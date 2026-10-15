@@ -84,6 +84,8 @@ type createJobRequest struct {
 	From     *string `json:"from"`
 	To       *string `json:"to"`
 	Stereo   *bool   `json:"stereo"`
+	// ReplacesSoundID reemplaza el audio de ese sonido en vez de crear uno nuevo.
+	ReplacesSoundID *string `json:"replacesSoundId"`
 }
 
 func (req *createJobRequest) validate() error {
@@ -108,6 +110,9 @@ func (req *createJobRequest) validate() error {
 		if field.value != nil && !trimTimePattern.MatchString(*field.value) {
 			problems.add(field.name + ": usa segundos (3.5) o mm:ss (1:23)")
 		}
+	}
+	if req.ReplacesSoundID != nil && !soundIDPattern.MatchString(*req.ReplacesSoundID) {
+		problems.add("replacesSoundId: debe ser un SHA-256 en hexadecimal")
 	}
 	return problems.err()
 }

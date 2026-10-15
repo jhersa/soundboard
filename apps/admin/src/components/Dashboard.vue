@@ -12,6 +12,18 @@ const POLL_MS = 2000;
 const jobs = ref<JobDto[]>([]);
 const sounds = ref<AdminSoundDto[]>([]);
 const error = ref<string | null>(null);
+// Sonido cuyo audio se va a reemplazar con el formulario (null: el formulario crea uno nuevo).
+const replacing = ref<AdminSoundDto | null>(null);
+
+function startReplace(sound: AdminSoundDto) {
+  replacing.value = sound;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function onCreated() {
+  replacing.value = null;
+  void refresh();
+}
 
 async function refresh() {
   try {
@@ -39,7 +51,7 @@ watch(active, (now, before) => {
 
 <template>
   <p v-if="error" class="error">{{ error }}</p>
-  <NewSoundForm @created="refresh" />
+  <NewSoundForm :replacing="replacing" @created="onCreated" @cancel="replacing = null" />
   <JobsList :jobs="jobs" @changed="refresh" />
-  <SoundsGrid :sounds="sounds" @changed="refresh" />
+  <SoundsGrid :sounds="sounds" @changed="refresh" @replace="startReplace" />
 </template>
