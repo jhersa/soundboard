@@ -1,6 +1,5 @@
 package com.cornytuna.soundboard.core.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -10,49 +9,50 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 
 // Generado por brand/scripts/build.mjs desde tokens.json. No editar a mano.
-private val DarkColorScheme = darkColorScheme(
-    primary = DeckPrimaryDark,
-    onPrimary = DeckOnPrimaryDark,
-    secondary = DeckSecondaryDark,
-    onSecondary = DeckOnSecondaryDark,
-    tertiary = DeckTertiaryDark,
-    onTertiary = DeckOnTertiaryDark,
-    background = DeckBackgroundDark,
-    onBackground = DeckOnBackgroundDark,
-    surface = DeckSurfaceDark,
-    onSurface = DeckOnSurfaceDark,
-    surfaceVariant = DeckSurfaceVariantDark,
-    onSurfaceVariant = DeckOnSurfaceVariantDark,
-    outline = DeckOutlineDark,
-    error = DeckErrorDark
-)
-
 private val LightColorScheme = lightColorScheme(
-    primary = DeckPrimaryLight,
-    onPrimary = DeckOnPrimaryLight,
-    secondary = DeckSecondaryLight,
-    onSecondary = DeckOnSecondaryLight,
-    tertiary = DeckTertiaryLight,
-    onTertiary = DeckOnTertiaryLight,
-    background = DeckBackgroundLight,
-    onBackground = DeckOnBackgroundLight,
-    surface = DeckSurfaceLight,
-    onSurface = DeckOnSurfaceLight,
-    surfaceVariant = DeckSurfaceVariantLight,
-    onSurfaceVariant = DeckOnSurfaceVariantLight,
-    outline = DeckOutlineLight,
-    error = DeckErrorLight
+    primary = BrandPrimaryLight,
+    onPrimary = BrandOnPrimaryLight,
+    secondary = BrandSecondaryLight,
+    onSecondary = BrandOnSecondaryLight,
+    tertiary = BrandTertiaryLight,
+    onTertiary = BrandOnTertiaryLight,
+    background = BrandBackgroundLight,
+    onBackground = BrandOnBackgroundLight,
+    surface = BrandSurfaceLight,
+    onSurface = BrandOnSurfaceLight,
+    surfaceVariant = BrandSurfaceVariantLight,
+    onSurfaceVariant = BrandOnSurfaceVariantLight,
+    outline = BrandOutlineLight,
+    error = BrandErrorLight
 )
 
-private val DeckShapes = Shapes(
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(22.dp)
+private val DarkColorScheme = darkColorScheme(
+    primary = BrandPrimaryDark,
+    onPrimary = BrandOnPrimaryDark,
+    secondary = BrandSecondaryDark,
+    onSecondary = BrandOnSecondaryDark,
+    tertiary = BrandTertiaryDark,
+    onTertiary = BrandOnTertiaryDark,
+    background = BrandBackgroundDark,
+    onBackground = BrandOnBackgroundDark,
+    surface = BrandSurfaceDark,
+    onSurface = BrandOnSurfaceDark,
+    surfaceVariant = BrandSurfaceVariantDark,
+    onSurfaceVariant = BrandOnSurfaceVariantDark,
+    outline = BrandOutlineDark,
+    error = BrandErrorDark
 )
 
+private val BrandShapes = Shapes(
+    small = RoundedCornerShape(6.dp),
+    medium = RoundedCornerShape(8.dp),
+    large = RoundedCornerShape(14.dp)
+)
+
+// El claro es el de entrada; el oscuro lo elige la persona (no sigue al sistema).
 @Composable
-fun SoundboardTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+fun CastBerryTheme(
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
@@ -60,7 +60,7 @@ fun SoundboardTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        shapes = DeckShapes,
+        shapes = BrandShapes,
         content = content
     )
 }

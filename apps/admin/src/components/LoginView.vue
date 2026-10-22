@@ -29,8 +29,7 @@ onMounted(() => {
       },
     });
     window.google.accounts.id.renderButton(buttonEl.value, {
-      // Sigue el tema del sistema, igual que el resto del panel.
-      theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "filled_black" : "outline",
+      theme: "outline", // el panel solo usa el tema claro
       size: "large",
       locale: "es",
     });
@@ -42,9 +41,8 @@ onUnmounted(() => clearInterval(timer));
 
 <template>
   <main class="center">
-    <img class="logo" src="/icon-192.png" alt="" />
-    <h1>Soundboard Admin</h1>
+    <h1 class="wordmark">Soundboard Admin</h1>
     <div ref="buttonEl" />
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="card error" role="alert">{{ error }}</p>
   </main>
 </template>

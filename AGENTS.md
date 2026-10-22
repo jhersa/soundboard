@@ -16,13 +16,13 @@ apps/api/         API en Go (net/http + SQLite con modernc.org/sqlite, sin CGO).
   migrations/     SQL numerado (0001_init.sql, ...), embebido en el binario
 apps/admin/       Panel admin: Vue 3 (<script setup>) + Vite. Componentes en src/components/
                   Estilos solo con variables `--color-*` de brand/ (importa brand/generated/tokens.css); no definas colores en styles.css
-apps/processor/   Processor en Go: servidor HTTP + cola de un job a la vez + pipeline que ejecuta yt-dlp, ffmpeg y cwebp
+apps/processor/   Processor en Go: servidor HTTP + cola de un job a la vez + pipeline que ejecuta yt-dlp, ffmpeg, cwebp y gif2webp
   cmd/processor/  binario: serve | healthcheck
   internal/server/    POST /process (firmado), cola, reporte de status y result a la API
   internal/pipeline/  descarga, ffmpeg (Vorbis + loudnorm), imagen a WebP; ParseTime y AudioFilter
   Dockerfile      multistage: build Go + Alpine con ffmpeg, libwebp-tools y yt-dlp_musllinux
 packages/gosig/   Firma HMAC en Go; la usan la API y el processor (módulo soundboard/gosig, por `replace`)
-brand/            Identidad visual portable (tokens.json → CSS y Compose, logos). Ver brand/README.md; la referencia es la app Android
+brand/            Identidad visual portable (tokens.json → CSS y Compose, iconos). Ver brand/README.md; la referencia es CastBerry
 packages/shared/  Contratos de la API (esquemas zod + tipos) para el panel; la API y el processor los implementan en Go
 scripts/          migrate-v1.mjs (v1 → apps/api/.data o GCS) y download.mjs (script v1, legado)
 infra/            Despliegue: terraform/ (GCP + DNS de Cloudflare) y ansible/ (VM con Docker Compose)
@@ -31,7 +31,7 @@ assets/, index.json  Biblioteca v1 que la app v1 lee desde GitHub. No modificar 
 
 ## Comandos
 
-Requisitos: Go 1.27+, Node 22+ (solo para el panel), pnpm 11. El processor sin Docker requiere `yt-dlp`, `ffmpeg` y `cwebp`.
+Requisitos: Go 1.27+, Node 22+ (solo para el panel), pnpm 11. El processor sin Docker requiere `yt-dlp`, `ffmpeg`, `cwebp` y `gif2webp` (estos dos vienen en el paquete `webp`).
 
 ```bash
 pnpm install
@@ -92,7 +92,7 @@ Antes de dar un cambio por terminado, corre `pnpm typecheck` y `pnpm test`.
   - `internal/httpapi/helpers_test.go` crea el servidor con SQLite `:memory:`, medios en una carpeta temporal, un verificador de Google falso (el token es `"<sub>|<email>"`) y un processor falso como `http.RoundTripper`.
   - `call()` espera los envíos al processor en segundo plano (`Server.Wait`).
 - **Processor:** `go test ./...`.
-  - `internal/pipeline` se prueba con un `Runner` falso (los argumentos de ffmpeg, cwebp y yt-dlp quedan fijados por tests) y con ffmpeg y cwebp reales en `integration_test.go`, que se salta si no están en el PATH.
+  - `internal/pipeline` se prueba con un `Runner` falso (los argumentos de ffmpeg, cwebp, gif2webp y yt-dlp quedan fijados por tests) y con ffmpeg, cwebp y gif2webp reales en `integration_test.go`, que se salta si no están en el PATH.
   - `internal/server` usa una API falsa que verifica la firma de cada llamada. `harness.stop()` espera a que la cola se vacíe antes de cerrarla: `Server.Stop` descarta (y reporta como fallidos) los jobs que no empezaron.
 - **Panel:** no tiene tests. Verifícalo con `pnpm dev:admin` y `VITE_DEV_TOKEN` en `.env.local`. Ese token solo se lee en modo dev y nunca debe llegar al build de producción.
 

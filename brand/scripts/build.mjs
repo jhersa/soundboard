@@ -21,31 +21,23 @@ const mayus = (s) => s[0].toUpperCase() + s.slice(1);
 const kebab = (s) => s.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
 const kt = (hex) => `Color(0xFF${hex.slice(1).toUpperCase()})`;
 const px = (n) => `${n}px`;
-const familia = (f) => `var(--font-${f})`;
-const lista = (fuentes) => fuentes.map((f) => (/\s/.test(f) ? `"${f}"` : f)).join(", ");
+const lista = (fuentes) => fuentes.map((f) => (/\s/.test(f) && !f.startsWith("var(") ? `"${f}"` : f)).join(", ");
+const sinMeta = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => !k.startsWith("$")));
+const paleta = t.marca.paleta;
 
 // ---------- CSS ----------
-function bloqueColores(modo) {
-  const roles = { ...t.colores[modo], ...t.extensionWeb[modo] };
-  return Object.entries(roles)
-    .map(([rol, hex]) => `  --color-${kebab(rol)}: ${hex};`)
-    .join("\n");
-}
+const lineas = (o, sangria = "  ") => Object.entries(o).map(([k, v]) => `${sangria}${k}: ${v};`).join("\n");
+const roles = (o) => Object.fromEntries(Object.entries(sinMeta(o)).map(([rol, v]) => [`--color-${kebab(rol)}`, v]));
+const colores = (modo) => ({ ...roles(t.colores[modo]), ...roles(t.extensionWeb[modo]), ...t.efectosWeb[modo] });
 
-const css = `/* Generado por brand/scripts/build.mjs desde tokens.json. No editar a mano. */
+const css = `/* Generado por brand/scripts/build.mjs desde tokens.json. No editar a mano.
+   El claro es el tema de entrada (sin prefers-color-scheme); el oscuro se activa
+   con data-theme="dark" en <html>. Display: importa @fontsource-variable/bricolage-grotesque. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
-  /* Marca (iguales en claro y oscuro) */
-  --brand-yellow: ${t.marca.amarillo};
-  --brand-yellow-dark: ${t.marca.amarilloOscuro};
-  --brand-lime: ${t.marca.lima};
-  --brand-magenta: ${t.marca.magenta};
-  --brand-cyan: ${t.marca.cian};
-  --brand-orange: ${t.marca.naranja};
-  --brand-red: ${t.marca.rojo};
-  --brand-violet-neon: ${t.marca.violetaNeon};
-  --brand-splash: ${t.marca.fondoSplash};
+  /* Paleta (igual en claro y oscuro) */
+${lineas(Object.fromEntries(Object.entries(paleta).map(([k, v]) => [`--palette-${k}`, v])))}
 
   /* Formas */
 ${Object.entries(t.formas).map(([k, v]) => `  --radius-${k}: ${px(v)};`).join("\n")}
@@ -53,45 +45,46 @@ ${Object.entries(t.formas).map(([k, v]) => `  --radius-${k}: ${px(v)};`).join("\
   /* Tipografía */
   --font-sans: ${lista(t.tipografia.sans)};
   --font-mono: ${lista(t.tipografia.mono)};
+  --font-display: ${lista(t.tipografia.display)};
 ${Object.entries(t.tipografia.estilos)
-  .map(([k, e]) => `  --type-${kebab(k)}: ${e.peso} ${px(e.tamano)}/${px(e.interlineado)} ${familia(e.familia)};
-  --type-${kebab(k)}-spacing: ${e.espaciado}px;`)
+  .map(([k, e]) => `  --type-${kebab(k)}: ${e.peso} ${e.tamanoCss ?? px(e.tamano)}/${e.interlineado} var(--font-${e.familia});
+  --type-${kebab(k)}-spacing: ${e.espaciadoEm}em;`)
   .join("\n")}
 
-  /* Colores: claro por defecto */
-${bloqueColores("claro")}
-}
+  /* Fijos en ambos temas: reproductor y texto sobre imágenes */
+${lineas(sinMeta(t.efectosWeb.comun))}
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-${bloqueColores("oscuro").replace(/^/gm, "  ")}
-  }
+  /* Colores: claro por defecto */
+${lineas(colores("claro"))}
 }
 
 :root[data-theme="dark"] {
-${bloqueColores("oscuro")}
+  color-scheme: dark;
+${lineas(colores("oscuro"))}
+}
+
+/* Franja petróleo del claro: pon class="band" en la barra y la cabecera. */
+.band {
+  background: var(--color-background);
+  color: var(--color-on-background);
+}
+:root:not([data-theme="dark"]) .band {
+  color-scheme: dark;
+${lineas({ ...roles(t.franja), ...t.efectosWeb.franja })}
 }
 `;
 
 // ---------- Kotlin ----------
-const rolesKt = Object.keys(t.colores.oscuro);
-const nombreKt = (rol, modo) => `Deck${mayus(rol)}${mayus(modo === "oscuro" ? "dark" : "light")}`;
+const rolesKt = Object.keys(sinMeta(t.colores.oscuro));
+const nombreKt = (rol, modo) => `Brand${mayus(rol)}${modo === "oscuro" ? "Dark" : "Light"}`;
 
 const colorKt = `package ${paquete}
 
 import androidx.compose.ui.graphics.Color
 
 // Generado por brand/scripts/build.mjs desde tokens.json. No editar a mano.
-val DeckYellow = ${kt(t.marca.amarillo)}
-val DeckYellowDark = ${kt(t.marca.amarilloOscuro)}
-val DeckLime = ${kt(t.marca.lima)}
-val DeckMagenta = ${kt(t.marca.magenta)}
-val DeckCyan = ${kt(t.marca.cian)}
-val DeckOrange = ${kt(t.marca.naranja)}
-val DeckRed = ${kt(t.marca.rojo)}
-val DeckVioletNeon = ${kt(t.marca.violetaNeon)}
-val DeckSplash = ${kt(t.marca.fondoSplash)}
-${["oscuro", "claro"]
+${Object.entries(paleta).map(([k, v]) => `val Brand${mayus(k)} = ${kt(v)}`).join("\n")}
+${["claro", "oscuro"]
   .map((m) => "\n" + rolesKt.map((r) => `val ${nombreKt(r, m)} = ${kt(t.colores[m][r])}`).join("\n"))
   .join("")}
 `;
@@ -103,7 +96,6 @@ const esquema = (modo, fn) =>
 
 const themeKt = `package ${paquete}
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -113,19 +105,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 
 // Generado por brand/scripts/build.mjs desde tokens.json. No editar a mano.
-${esquema("oscuro", "darkColorScheme")}
-
 ${esquema("claro", "lightColorScheme")}
 
-private val DeckShapes = Shapes(
+${esquema("oscuro", "darkColorScheme")}
+
+private val BrandShapes = Shapes(
     small = RoundedCornerShape(${t.formas.small}.dp),
     medium = RoundedCornerShape(${t.formas.medium}.dp),
     large = RoundedCornerShape(${t.formas.large}.dp)
 )
 
+// El claro es el de entrada; el oscuro lo elige la persona (no sigue al sistema).
 @Composable
-fun SoundboardTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+fun ${t.marca.nombre}Theme(
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
@@ -133,31 +126,37 @@ fun SoundboardTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        shapes = DeckShapes,
+        shapes = BrandShapes,
         content = content
     )
 }
 `;
 
-const famKt = { sans: "FontFamily.Default", mono: "FontFamily.Monospace" };
-const pesoKt = { 400: "Normal", 600: "SemiBold" };
+// Bricolage no viene en Android: agrégala en res/font y cambia DisplayFont.
+const famKt = { sans: "FontFamily.Default", mono: "FontFamily.Monospace", display: "DisplayFont" };
+const pesoKt = { 400: "Normal", 600: "SemiBold", 700: "Bold", 800: "ExtraBold" };
 const typeKt = `package ${paquete}
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
 // Generado por brand/scripts/build.mjs desde tokens.json. No editar a mano.
+// Display: Bricolage Grotesque. Agrégala en res/font y reemplaza FontFamily.Default.
+val DisplayFont: FontFamily = FontFamily.Default
+
 val Typography = Typography(
-${Object.entries(t.tipografia.estilos)
-  .map(([k, e]) => `    ${k} = TextStyle(
+${Object.values(t.tipografia.estilos)
+  .filter((e) => e.material)
+  .map((e) => `    ${e.material} = TextStyle(
         fontFamily = ${famKt[e.familia]},
         fontWeight = FontWeight.${pesoKt[e.peso]},
         fontSize = ${e.tamano}.sp,
-        lineHeight = ${e.interlineado}.sp,
-        letterSpacing = ${e.espaciado}.sp
+        lineHeight = ${e.interlineado}.em,
+        letterSpacing = ${e.espaciadoEm}.em
     )`)
   .join(",\n")}
 )

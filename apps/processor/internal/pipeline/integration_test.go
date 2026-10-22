@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -153,6 +154,32 @@ func TestIntegracionImagenReal(t *testing.T) {
 		if err != nil || strings.TrimSpace(string(out)) != strconv.Itoa(tc.width)+"x"+strconv.Itoa(tc.high) {
 			t.Errorf("%s: tamaño %q (%v); se esperaba %dx%d", name, out, err, tc.width, tc.high)
 		}
+	}
+}
+
+func TestIntegracionGifAnimado(t *testing.T) {
+	requireTools(t, "ffmpeg", "gif2webp")
+	gif := generate(t, "-f", "lavfi", "-i", "testsrc=duration=2:size=320x240:rate=10", "x.gif")
+	audio := generate(t, "-f", "lavfi", "-i", "sine=duration=1", "x.wav")
+	image := "upload:uploads/i.gif"
+	result, err := (&Pipeline{Runner: ExecRunner{}}).Process(context.Background(), Options{
+		URL: "upload:uploads/a.wav", ImageURL: &image,
+		FetchUpload: func(_ context.Context, source string) (Downloaded, error) {
+			if source == image {
+				return Downloaded{Data: gif, ContentType: "image/gif", Ext: ".gif"}, nil
+			}
+			return Downloaded{Data: audio, Ext: ".wav"}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := result.Image.Data
+	if result.Image.ContentType != "image/webp" || string(data[8:12]) != "WEBP" || !bytes.Contains(data[:64], []byte("ANIM")) {
+		t.Fatalf("no es WebP animado: %s %q", result.Image.ContentType, data[:16])
+	}
+	if len(data) >= len(gif) {
+		t.Errorf("el WebP (%d bytes) no es más chico que el GIF (%d)", len(data), len(gif))
 	}
 }
 
