@@ -1,92 +1,131 @@
-/* Generado por brand/scripts/build.mjs desde tokens.json. No editar a mano. */
+/* Generado por brand/scripts/build.mjs desde tokens.json. No editar a mano.
+   El claro es el tema de entrada (sin prefers-color-scheme); el oscuro se activa
+   con data-theme="dark" en <html>. Display: importa @fontsource-variable/bricolage-grotesque. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
-  /* Marca (iguales en claro y oscuro) */
-  --brand-yellow: #FFD600;
-  --brand-yellow-dark: #C7A500;
-  --brand-lime: #B2FF59;
-  --brand-magenta: #E040FB;
-  --brand-cyan: #40C4FF;
-  --brand-orange: #FFAB40;
-  --brand-red: #FF5252;
-  --brand-violet-neon: #C04BFF;
-  --brand-splash: #0E0A14;
+  /* Paleta (igual en claro y oscuro) */
+  --palette-snow: #F3F4F4;
+  --palette-sage: #5F9598;
+  --palette-deep: #1D546D;
+  --palette-ink: #061E29;
 
   /* Formas */
-  --radius-small: 10px;
-  --radius-medium: 16px;
-  --radius-large: 22px;
+  --radius-small: 6px;
+  --radius-medium: 8px;
+  --radius-large: 14px;
   --radius-pill: 999px;
 
   /* Tipografía */
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --type-title-large: 600 22px/28px var(--font-mono);
-  --type-title-large-spacing: 0px;
-  --type-body-large: 400 16px/24px var(--font-sans);
-  --type-body-large-spacing: 0.5px;
-  --type-label-medium: 600 12px/16px var(--font-sans);
-  --type-label-medium-spacing: 0.2px;
+  --font-display: "Bricolage Grotesque Variable", var(--font-sans);
+  --type-display: 800 clamp(2rem, 1.25rem + 3vw, 3.5rem)/1.02 var(--font-display);
+  --type-display-spacing: -0.03em;
+  --type-title-large: 700 22px/1.273 var(--font-display);
+  --type-title-large-spacing: -0.01em;
+  --type-title-medium: 700 20px/1.28 var(--font-display);
+  --type-title-medium-spacing: -0.01em;
+  --type-meta: 600 16px/1.5 var(--font-sans);
+  --type-meta-spacing: 0em;
+  --type-body-large: 400 16px/1.5 var(--font-sans);
+  --type-body-large-spacing: 0em;
+  --type-label-medium: 600 12px/1.333 var(--font-sans);
+  --type-label-medium-spacing: 0.015em;
+
+  /* Fijos en ambos temas: reproductor y texto sobre imágenes */
+  --on-light: var(--palette-ink);
+  --player-accent: var(--palette-sage);
+  --player-glow: var(--palette-deep);
+  --player-ground: #03121a;
+  --scrim: rgba(3, 18, 26, 0.94);
+  --scrim-clear: rgba(3, 18, 26, 0);
+  --on-scrim: #f3f4f4;
+  --on-scrim-muted: #c3d6d8;
 
   /* Colores: claro por defecto */
-  --color-primary: #C7A500;
-  --color-on-primary: #000000;
-  --color-secondary: #8BDB2A;
-  --color-on-secondary: #000000;
-  --color-tertiary: #E040FB;
-  --color-on-tertiary: #000000;
-  --color-background: #F7F7F5;
-  --color-on-background: #16171D;
-  --color-surface: #FFFFFF;
-  --color-on-surface: #16171D;
-  --color-surface-variant: #EDEDEA;
-  --color-on-surface-variant: #5C5E66;
-  --color-outline: #D8D8D4;
-  --color-error: #D32F2F;
-  --color-success: #2E7D00;
-  --color-warning: #A04F00;
-  --color-info: #006FA8;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --color-primary: #FFD600;
-    --color-on-primary: #000000;
-    --color-secondary: #B2FF59;
-    --color-on-secondary: #000000;
-    --color-tertiary: #E040FB;
-    --color-on-tertiary: #000000;
-    --color-background: #0A0A0A;
-    --color-on-background: #F8F8F0;
-    --color-surface: #141414;
-    --color-on-surface: #F8F8F0;
-    --color-surface-variant: #1E1E1E;
-    --color-on-surface-variant: #A0A09A;
-    --color-outline: #2E2E2E;
-    --color-error: #FF5252;
-    --color-success: #B2FF59;
-    --color-warning: #FFAB40;
-    --color-info: #40C4FF;
-  }
+  --color-primary: #1D546D;
+  --color-on-primary: #FFFFFF;
+  --color-secondary: #5F9598;
+  --color-on-secondary: #061E29;
+  --color-tertiary: #061E29;
+  --color-on-tertiary: #F3F4F4;
+  --color-background: #C7D7D8;
+  --color-on-background: #061E29;
+  --color-surface: #F3F4F4;
+  --color-on-surface: #0C2A38;
+  --color-surface-variant: #E3E9EA;
+  --color-on-surface-variant: #3E5864;
+  --color-outline: #A3B9BC;
+  --color-error: #B3261E;
+  --color-outline-strong: #5A7480;
+  --color-success: #2E6B3F;
+  --color-warning: #8A5A00;
+  --color-info: #1D546D;
+  --color-accent-text: #1D546D;
+  --color-focus: #1D546D;
+  --color-brand: #1D546D;
+  --color-progress: #5F9598;
+  --color-progress-page: #1D546D;
+  --color-progress-track: color-mix(in srgb, #061E29 18%, transparent);
+  --color-poster-empty: #F3F4F4;
+  --backdrop-opacity: 0.3;
+  --ambient: radial-gradient(120% 70% at 15% 0%, color-mix(in srgb, var(--palette-sage) 22%, transparent), transparent 70%);
 }
 
 :root[data-theme="dark"] {
-  --color-primary: #FFD600;
-  --color-on-primary: #000000;
-  --color-secondary: #B2FF59;
-  --color-on-secondary: #000000;
-  --color-tertiary: #E040FB;
-  --color-on-tertiary: #000000;
-  --color-background: #0A0A0A;
-  --color-on-background: #F8F8F0;
-  --color-surface: #141414;
-  --color-on-surface: #F8F8F0;
-  --color-surface-variant: #1E1E1E;
-  --color-on-surface-variant: #A0A09A;
-  --color-outline: #2E2E2E;
-  --color-error: #FF5252;
-  --color-success: #B2FF59;
-  --color-warning: #FFAB40;
-  --color-info: #40C4FF;
+  color-scheme: dark;
+  --color-primary: #F3F4F4;
+  --color-on-primary: #061E29;
+  --color-secondary: #5F9598;
+  --color-on-secondary: #061E29;
+  --color-tertiary: #1D546D;
+  --color-on-tertiary: #F3F4F4;
+  --color-background: #061E29;
+  --color-on-background: #F3F4F4;
+  --color-surface: #0F3242;
+  --color-on-surface: #F3F4F4;
+  --color-surface-variant: #194A5D;
+  --color-on-surface-variant: #B3CDD1;
+  --color-outline: #2A5A6D;
+  --color-error: #FF8A80;
+  --color-outline-strong: #6F9AA6;
+  --color-success: #8FD19E;
+  --color-warning: #FFD27A;
+  --color-info: #8FC2C4;
+  --color-accent-text: #8FC2C4;
+  --color-focus: #F3F4F4;
+  --color-brand: #F3F4F4;
+  --color-progress: #5F9598;
+  --color-progress-page: #5F9598;
+  --color-progress-track: color-mix(in srgb, #F3F4F4 10%, transparent);
+  --color-poster-empty: #194A5D;
+  --backdrop-opacity: 0.5;
+  --ambient: radial-gradient(120% 70% at 15% 0%, color-mix(in srgb, var(--palette-deep) 70%, transparent), transparent 70%);
+}
+
+/* Franja petróleo del claro: pon class="band" en la barra y la cabecera. */
+.band {
+  background: var(--color-background);
+  color: var(--color-on-background);
+}
+:root:not([data-theme="dark"]) .band {
+  color-scheme: dark;
+  --color-background: #1D546D;
+  --color-on-background: #F3F4F4;
+  --color-surface: #24607B;
+  --color-on-surface: #F3F4F4;
+  --color-surface-variant: #2A6680;
+  --color-on-surface-variant: #C9DCDF;
+  --color-outline: #3A7590;
+  --color-outline-strong: #8FB4BF;
+  --color-primary: #F3F4F4;
+  --color-on-primary: #061E29;
+  --color-brand: #F3F4F4;
+  --color-accent-text: #A9D0D2;
+  --color-focus: #F3F4F4;
+  --color-progress-page: #A9D0D2;
+  --color-progress-track: color-mix(in srgb, #F3F4F4 18%, transparent);
+  --color-poster-empty: #24607B;
+  --backdrop-opacity: 0.45;
 }

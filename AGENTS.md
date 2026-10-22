@@ -22,7 +22,7 @@ apps/processor/   Processor en Go: servidor HTTP + cola de un job a la vez + pip
   internal/pipeline/  descarga, ffmpeg (Vorbis + loudnorm), imagen a WebP; ParseTime y AudioFilter
   Dockerfile      multistage: build Go + Alpine con ffmpeg, libwebp-tools y yt-dlp_musllinux
 packages/gosig/   Firma HMAC en Go; la usan la API y el processor (módulo soundboard/gosig, por `replace`)
-brand/            Identidad visual portable (tokens.json → CSS y Compose, logos). Ver brand/README.md; la referencia es la app Android
+brand/            Identidad visual portable (tokens.json → CSS y Compose, iconos). Ver brand/README.md; la referencia es CastBerry
 packages/shared/  Contratos de la API (esquemas zod + tipos) para el panel; la API y el processor los implementan en Go
 scripts/          migrate-v1.mjs (v1 → apps/api/.data o GCS) y download.mjs (script v1, legado)
 infra/            Despliegue: terraform/ (GCP + DNS de Cloudflare) y ansible/ (VM con Docker Compose)

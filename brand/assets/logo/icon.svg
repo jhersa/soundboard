@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>CastBerry</title>
+  <rect width="512" height="512" rx="112" fill="#1d546d"/>
+  <path d="M338 170a118 118 0 1 0 0 172" fill="none" stroke="#f3f4f4" stroke-width="64" stroke-linecap="round"/>
+  <circle cx="372" cy="256" r="30" fill="#5f9598"/>
+</svg>
