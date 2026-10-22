@@ -346,6 +346,9 @@ func (p *Pipeline) downloadImage(ctx context.Context, target string, fetchUpload
 		}
 		return Image{}, fmt.Errorf("La imagen no es de un tipo soportado (content-type: %s)", shown)
 	}
+	if contentType == "image/gif" {
+		return p.gifToWebp(ctx, data)
+	}
 	if !resizableImageTypes[contentType] {
 		return Image{Data: data, ContentType: contentType}, nil
 	}
@@ -356,7 +359,26 @@ func (p *Pipeline) downloadImage(ctx context.Context, target string, fetchUpload
 	return Image{Data: webp, ContentType: "image/webp"}, nil
 }
 
-func (p *Pipeline) convertToWebp(ctx context.Context, data []byte, sourceExt string) ([]byte, error) {
+// gifToWebp pasa un GIF a WebP animado con gif2webp (cwebp no anima). No se redimensiona: el peso de
+// un GIF está en sus cuadros, y así baja ~65% con la biblioteca v1. Si el WebP no sale más chico,
+// se queda el GIF.
+func (p *Pipeline) gifToWebp(ctx context.Context, data []byte) (Image, error) {
+	webp, err := withTempFiles(data, ".gif", func(source, output string) error {
+		_, err := p.Runner.Run(ctx, "gif2webp", "-quiet", "-lossy", "-q", imageQuality, "-m", "4", "-mt",
+			"-metadata", "none", source, "-o", output)
+		return err
+	})
+	if err != nil {
+		return Image{}, err
+	}
+	if len(webp) >= len(data) {
+		return Image{Data: data, ContentType: "image/gif"}, nil
+	}
+	return Image{Data: webp, ContentType: "image/webp"}, nil
+}
+
+// withTempFiles escribe data en una carpeta temporal, corre convert(source, output) y devuelve output.
+func withTempFiles(data []byte, sourceExt string, convert func(source, output string) error) ([]byte, error) {
 	dir, err := os.MkdirTemp("", "soundboard-")
 	if err != nil {
 		return nil, err
@@ -367,30 +389,36 @@ func (p *Pipeline) convertToWebp(ctx context.Context, data []byte, sourceExt str
 	if err := os.WriteFile(source, data, 0o600); err != nil {
 		return nil, err
 	}
-
-	out, err := p.Runner.Run(ctx, "ffprobe", "-v", "error", "-select_streams", "v:0",
-		"-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", source)
-	if err != nil {
-		return nil, err
-	}
-	var width, height float64
-	if dims := strings.Split(strings.TrimSpace(out), "x"); len(dims) >= 2 {
-		width, _ = strconv.ParseFloat(dims[0], 64)
-		height, _ = strconv.ParseFloat(dims[1], 64)
-	}
-	// cwebp mantiene la proporción cuando una de las dos dimensiones es 0.
-	var resize []string
-	switch {
-	case math.Max(width, height) <= imageMaxSize:
-	case width >= height:
-		resize = []string{"-resize", strconv.Itoa(imageMaxSize), "0"}
-	default:
-		resize = []string{"-resize", "0", strconv.Itoa(imageMaxSize)}
-	}
-	args := append([]string{"-quiet", "-q", imageQuality, "-metadata", "none"}, resize...)
-	args = append(args, source, "-o", output)
-	if _, err := p.Runner.Run(ctx, "cwebp", args...); err != nil {
+	if err := convert(source, output); err != nil {
 		return nil, err
 	}
 	return os.ReadFile(output)
+}
+
+func (p *Pipeline) convertToWebp(ctx context.Context, data []byte, sourceExt string) ([]byte, error) {
+	return withTempFiles(data, sourceExt, func(source, output string) error {
+		out, err := p.Runner.Run(ctx, "ffprobe", "-v", "error", "-select_streams", "v:0",
+			"-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", source)
+		if err != nil {
+			return err
+		}
+		var width, height float64
+		if dims := strings.Split(strings.TrimSpace(out), "x"); len(dims) >= 2 {
+			width, _ = strconv.ParseFloat(dims[0], 64)
+			height, _ = strconv.ParseFloat(dims[1], 64)
+		}
+		// cwebp mantiene la proporción cuando una de las dos dimensiones es 0.
+		var resize []string
+		switch {
+		case math.Max(width, height) <= imageMaxSize:
+		case width >= height:
+			resize = []string{"-resize", strconv.Itoa(imageMaxSize), "0"}
+		default:
+			resize = []string{"-resize", "0", strconv.Itoa(imageMaxSize)}
+		}
+		args := append([]string{"-quiet", "-q", imageQuality, "-metadata", "none"}, resize...)
+		args = append(args, source, "-o", output)
+		_, err = p.Runner.Run(ctx, "cwebp", args...)
+		return err
+	})
 }

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Processor de Soundboard: binario de Go + ffmpeg, cwebp y yt-dlp. Se construye desde la raíz:
+# Processor de Soundboard: binario de Go + ffmpeg, cwebp/gif2webp y yt-dlp. Se construye desde la raíz:
 #   docker build -f apps/processor/Dockerfile -t soundboard-processor .
 # o, para desarrollo local: docker compose -f apps/processor/compose.yaml up --build
 
@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags="-s -w" -o /out/processor ./cmd/processor
 
-# ---- 2. runtime: Alpine + ffmpeg + cwebp + yt-dlp ----
+# ---- 2. runtime: Alpine + ffmpeg + cwebp/gif2webp (libwebp-tools) + yt-dlp ----
 FROM alpine:3 AS runtime
 ARG TARGETARCH
 # yt-dlp como binario standalone (PyInstaller para musl) y propiedad del usuario `app`, para que

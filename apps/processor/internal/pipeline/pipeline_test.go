@@ -238,6 +238,8 @@ func TestImagenes(t *testing.T) {
 				}
 			case "cwebp":
 				return "", os.WriteFile(args[len(args)-1], []byte("RIFFxxxxWEBP"), 0o600)
+			case "gif2webp": // más chico que el GIF ("bytes")
+				return "", os.WriteFile(args[len(args)-1], []byte("RIFF"), 0o600)
 			}
 			return inner(name, args)
 		}
@@ -270,13 +272,16 @@ func TestImagenes(t *testing.T) {
 		}
 	}
 
-	// JPEG también se convierte; GIF pasa sin tocar y sin invocar cwebp.
+	// JPEG también se convierte; GIF pasa a WebP animado con gif2webp, sin redimensionar.
 	if _, result, err := process(images.URL+"/a.jpg", "100x100"); err != nil || result.Image.ContentType != "image/webp" {
 		t.Errorf("jpeg: %v %+v", err, result.Image)
 	}
 	runner, result, err := process(images.URL+"/a.gif", "100x100")
-	if err != nil || runner.find("cwebp") != nil || result.Image.ContentType != "image/gif" || string(result.Image.Data) != "bytes" {
-		t.Errorf("gif: %v %+v", err, result.Image)
+	gifArgs := runner.find("gif2webp")
+	wantArgs := []string{"-quiet", "-lossy", "-q", "80", "-m", "4", "-mt", "-metadata", "none"}
+	if err != nil || runner.find("cwebp") != nil || len(gifArgs) != len(wantArgs)+3 || !slices.Equal(gifArgs[:len(wantArgs)], wantArgs) ||
+		result.Image.ContentType != "image/webp" || string(result.Image.Data) != "RIFF" {
+		t.Errorf("gif: %v %v %+v", err, gifArgs, result.Image)
 	}
 
 	for url, want := range map[string]string{
@@ -289,8 +294,16 @@ func TestImagenes(t *testing.T) {
 		}
 	}
 
-	// Las imágenes subidas usan el content-type que devolvió la API.
+	// Las imágenes subidas usan el content-type que devolvió la API. Si el WebP sale más grande
+	// que el GIF, se queda el GIF.
 	runner = ffmpegRunner("10\n")
+	inner := runner.handler
+	runner.handler = func(name string, args []string) (string, error) {
+		if name == "gif2webp" {
+			return "", os.WriteFile(args[len(args)-1], []byte("RIFFxxxxWEBP"), 0o600)
+		}
+		return inner(name, args)
+	}
 	image := "upload:uploads/i.gif"
 	result, err = (&Pipeline{Runner: runner}).Process(context.Background(), Options{
 		URL: "upload:uploads/a.mp3", ImageURL: &image,
@@ -301,7 +314,7 @@ func TestImagenes(t *testing.T) {
 			return Downloaded{Data: []byte("a"), Ext: ".mp3"}, nil
 		},
 	})
-	if err != nil || result.Image.ContentType != "image/gif" {
+	if err != nil || result.Image.ContentType != "image/gif" || string(result.Image.Data) != "gif" {
 		t.Errorf("upload de imagen: %v %+v", err, result.Image)
 	}
 }

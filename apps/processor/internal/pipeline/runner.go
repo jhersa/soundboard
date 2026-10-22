@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Runner ejecuta una herramienta externa (yt-dlp, ffmpeg, ffprobe, cwebp) y devuelve su stdout.
+// Runner ejecuta una herramienta externa (yt-dlp, ffmpeg, ffprobe, cwebp, gif2webp) y devuelve su stdout.
 type Runner interface {
 	Run(ctx context.Context, name string, args ...string) (string, error)
 }
