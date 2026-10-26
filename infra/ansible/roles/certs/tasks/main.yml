@@ -31,3 +31,20 @@
       --cert-name {{ base_domain }}
       -d {{ base_domain }} -d *.{{ base_domain }}
     creates: "{{ app_dir }}/letsencrypt/live/{{ base_domain }}/fullchain.pem"
+
+# Certificado propio de CastBerry: el wildcard de arriba no cubre otro dominio. El certbot
+# del compose lo renueva junto con el resto (comparten ./letsencrypt).
+- name: Emitir certificado {{ castberry_domain }}
+  ansible.builtin.command:
+    cmd: >-
+      docker run --rm
+      -v {{ app_dir }}/letsencrypt:/etc/letsencrypt
+      -v {{ app_dir }}/secrets:/secrets:ro
+      certbot/dns-cloudflare certonly --non-interactive --agree-tos
+      -m {{ letsencrypt_email }}
+      --key-type ecdsa
+      --dns-cloudflare --dns-cloudflare-credentials /secrets/cloudflare.ini
+      --dns-cloudflare-propagation-seconds 30
+      --cert-name {{ castberry_domain }}
+      -d {{ castberry_domain }}
+    creates: "{{ app_dir }}/letsencrypt/live/{{ castberry_domain }}/fullchain.pem"

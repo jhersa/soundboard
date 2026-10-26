@@ -1,0 +1,33 @@
+# Túnel WireGuard hacia la Raspberry Pi de CastBerry. La Pi inicia la conexión; esta VM solo escucha
+# en UDP 51820 (ver el firewall `soundboard-wireguard` en terraform).
+- name: WireGuard
+  ansible.builtin.apt:
+    name: wireguard-tools
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# nginx (en Docker) llega a 10.8.0.2 reenviando por el host: hace falta reenvío de IP.
+- name: Reenvío de IP
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Configuración de wg0
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Reiniciar wg0
+
+- name: Activar wg0 al arrancar
+  ansible.builtin.service:
+    name: wg-quick@wg0
+    state: started
+    enabled: true

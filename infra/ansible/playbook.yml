@@ -15,5 +15,6 @@
   roles:
     - { role: base, tags: [base] }
     - { role: certs, tags: [certs] }
+    - { role: castberry_tunnel, tags: [castberry] }
     - { role: app, tags: [app] }
     - { role: backup, tags: [backup] }
