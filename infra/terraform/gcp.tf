@@ -71,6 +71,20 @@ resource "google_compute_firewall" "web" {
   depends_on = [google_project_service.services]
 }
 
+# Túnel WireGuard hacia la Raspberry Pi de CastBerry (la Pi inicia la conexión).
+resource "google_compute_firewall" "wireguard" {
+  name          = "soundboard-wireguard"
+  network       = "default"
+  target_tags   = ["soundboard"]
+  source_ranges = ["0.0.0.0/0"]
+
+  allow {
+    protocol = "udp"
+    ports    = ["51820"]
+  }
+  depends_on = [google_project_service.services]
+}
+
 resource "google_compute_firewall" "ssh" {
   name          = "soundboard-ssh"
   network       = "default"

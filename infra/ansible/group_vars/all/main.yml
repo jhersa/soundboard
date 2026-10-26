@@ -36,3 +36,13 @@ google_web_client_id: "{{ vault_google_web_client_id }}"
 google_client_ids: "{{ vault_google_client_ids }}"
 # Contenido de un cookies.txt para yt-dlp (opcional; YouTube suele bloquear IPs de datacenter).
 ytdlp_cookies: "{{ vault_ytdlp_cookies | default('') }}"
+
+# CastBerry: su backend y sus películas viven en una Raspberry Pi en casa. Esta VM
+# atiende castberry.<dominio> con su propio certificado y lo reenvía por WireGuard
+# (10.8.0.1 aquí, 10.8.0.2 en la Pi). La Pi inicia la conexión.
+castberry_domain: castberry.homunculos.suave.sh
+castberry_upstream: "10.8.0.2:8081"
+wg_address: 10.8.0.1/24
+wg_listen_port: 51820
+wg_pi_public_key: "LOL1XZaR4QUM/TL1MgZBqrtlAM/lCEIpYkcYNu9veG0="
+# Llave privada de esta VM: vault_wg_private_key en vault.yml.

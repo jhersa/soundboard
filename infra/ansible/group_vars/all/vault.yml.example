@@ -4,6 +4,8 @@ vault_processor_secret: "genera-uno-con-openssl-rand-hex-32"
 vault_cloudflare_dns_token: "..."
 vault_google_web_client_id: "XXXX.apps.googleusercontent.com"
 vault_google_client_ids: "WEB.apps.googleusercontent.com,ANDROID.apps.googleusercontent.com"
+# Llave privada de WireGuard de la VM de CastBerry (contenido de la llave generada con `wg genkey`).
+vault_wg_private_key: "genera-con-wg-genkey"
 # vault_ytdlp_cookies: |
 #   # Netscape HTTP Cookie File
 #   ...

@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+[Interface]
+Address = {{ wg_address }}
+ListenPort = {{ wg_listen_port }}
+PrivateKey = {{ vault_wg_private_key }}
+MTU = 1380
+# nginx habla desde la red de Docker (172.16.0.0/12). La Pi solo acepta paquetes de 10.8.0.1,
+# así que se reescribe el origen al de esta VM en el túnel.
+PostUp = iptables -t nat -A POSTROUTING -s 172.16.0.0/12 -o %i -j MASQUERADE
+PostUp = iptables -A FORWARD -s 172.16.0.0/12 -o %i -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -s 172.16.0.0/12 -o %i -j MASQUERADE
+PostDown = iptables -D FORWARD -s 172.16.0.0/12 -o %i -j ACCEPT
+
+[Peer]
+# Raspberry Pi de CastBerry. Sin Endpoint: la Pi inicia la conexión.
+PublicKey = {{ wg_pi_public_key }}
+AllowedIPs = 10.8.0.2/32
